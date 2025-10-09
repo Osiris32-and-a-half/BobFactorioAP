@@ -24,8 +24,8 @@ def main():
         raw, best, tech, cat = item.eval()
         output[name] = {"raw_ingredients": {item.name: cost for item, cost in raw.items()},
                         "best_recipe": best.name if best else None,
-                        "technologies": [technology.name for technology in tech],
-                        "category": list(cat)}
+                        "technologies": list(sorted(technology.name for technology in tech)),
+                        "category": list(sorted(cat))}
     json.dump(output, open("data/precalc.json", "w"), indent=4, sort_keys=True)
 
 
