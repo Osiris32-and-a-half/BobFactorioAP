@@ -54,8 +54,8 @@ data.raw["recipe"]["{{recipe_name}}"] = {
     name = "{{recipe_name}}",
     category = "{{recipe.category}}",
     energy_required = {{recipe.energy}},
-    ingredients = {{ dict_to_recipe(recipe.ingredients, liquids) }}
-    results = {{ dict_to_recipe(recipe.products, liquids) }}
+    ingredients = {{ dict_to_recipe(recipe.ingredients, liquids) }},
+    results = {{ dict_to_recipe(recipe.products, liquids) }},
     allow_productivity = {{recipe.productivity}}
 }
 {%- endfor %}
