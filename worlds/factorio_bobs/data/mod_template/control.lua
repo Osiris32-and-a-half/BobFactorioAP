@@ -22,10 +22,8 @@ end
 
 if settings.global[ARCHIPELAGO_ENERGY_LINK_SETTING].value then
     ENERGY_INCREMENT = 10000000
-    game.player.force.recipes["ap-energy-bridge"].enabled=true
 else
     ENERGY_INCREMENT = 0
-    game.player.force.recipes["ap-energy-bridge"].enabled=false
 end
 
 
@@ -366,6 +364,11 @@ function on_player_created(event)
     -- FIXME: This (probably) fires before any other mod has a chance to change the player's force
     -- For now, they will (probably) always be on the 'player' force when this event fires.
     local data = {}
+    if settings.global[ARCHIPELAGO_ENERGY_LINK_SETTING].value then
+        player.force.recipes["ap-energy-bridge"].enabled=true
+    else
+        player.force.recipes["ap-energy-bridge"].enabled=false
+    end
     data['pending_samples'] = table.deepcopy(storage.forcedata[player.force.name]['earned_samples'])
     storage.playerdata[player.index] = data
     update_player(player.index)  -- Attempt to send pending free samples, if relevant.
