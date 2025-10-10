@@ -345,10 +345,10 @@ function on_runtime_mod_setting_changed(event)
     if event.setting == ARCHIPELAGO_ENERGY_LINK_SETTING then
         if settings.global[ARCHIPELAGO_ENERGY_LINK_SETTING].value then
             ENERGY_INCREMENT = 10000000
-            game.player.force.recipes["ap-energy-bridge"].enabled=true
+            force.recipes["ap-energy-bridge"].enabled=true
         else
             ENERGY_INCREMENT = 0
-            game.player.force.recipes["ap-energy-bridge"].enabled=false
+            force.recipes["ap-energy-bridge"].enabled=false
         end
         if force ~= nil then
             dumpInfo(force)
