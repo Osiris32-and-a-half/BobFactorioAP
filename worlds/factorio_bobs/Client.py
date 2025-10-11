@@ -358,6 +358,7 @@ async def factorio_server_watcher(ctx: FactorioContext):
                         logger.info("Established bridge to Factorio Server. "
                                     "Ready to connect to Archipelago via /connect")
                         check_stdin()
+                        ctx.server_task = asyncio.create_task(server_loop(ctx), name="ServerLoop")
 
                 if not ctx.awaiting_bridge and "Archipelago Bridge Data available for game tick " in msg:
                     ctx.awaiting_bridge = True
@@ -497,7 +498,7 @@ async def factorio_spinup_server(ctx: FactorioContext) -> bool:
 
 async def main(make_context):
     ctx = make_context()
-    ctx.server_task = asyncio.create_task(server_loop(ctx), name="ServerLoop")
+    # ctx.server_task = asyncio.create_task(server_loop(ctx), name="ServerLoop")
 
     if gui_enabled:
         ctx.run_gui()
