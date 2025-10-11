@@ -49,15 +49,11 @@ data.raw["rocket-silo"]["rocket-silo"].fluid_boxes = {
 data.raw["rocket-silo"]["rocket-silo"].fluid_boxes_off_when_no_fluid_recipe = true
 
 {%- for recipe_name, recipe in custom_recipes.items() %}
-data.raw["recipe"]["{{recipe_name}}"] = {
-    type = "recipe",
-    name = "{{recipe_name}}",
-    category = "{{recipe.category}}",
-    energy_required = {{recipe.energy}},
-    ingredients = {{ dict_to_recipe(recipe.ingredients, liquids) }},
-    results = {{ dict_to_recipe(recipe.products, liquids) }},
-    allow_productivity = {{recipe.productivity}}
-}
+data.raw["recipe"]["{{recipe_name}}"].category = "{{recipe.category}}"
+data.raw["recipe"]["{{recipe_name}}"].energy_required = {{recipe.energy}}
+data.raw["recipe"]["{{recipe_name}}"].ingredients = {{ dict_to_recipe(recipe.ingredients, liquids) }}
+data.raw["recipe"]["{{recipe_name}}"].results = {{ dict_to_recipe(recipe.products, liquids) }}
+data.raw["recipe"]["{{recipe_name}}"].allow_productivity = {{recipe.productivity}}
 {%- endfor %}
 
 local technologies = data.raw["technology"]
@@ -154,7 +150,7 @@ data.raw["ammo"]["artillery-shell"].stack_size = 10
 {# each randomized tech gets set to be invisible, with new nodes added that trigger those #}
 {%- for original_tech_name in base_tech_table -%}
 technologies["{{ original_tech_name }}"].hidden = true
--- technologies["{{ original_tech_name }}"].hidden_in_factoriopedia = true
+technologies["{{ original_tech_name }}"].hidden_in_factoriopedia = false
 technologies["{{ original_tech_name }}"].unit =
 {
   count_formula = "1",
