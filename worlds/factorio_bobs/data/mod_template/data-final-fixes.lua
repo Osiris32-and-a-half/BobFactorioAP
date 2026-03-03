@@ -1,4 +1,4 @@
-{% from "macros.lua" import dict_to_recipe, variable_to_lua %}
+{% from "macros.lua" import dict_to_recipe, dict_to_lua, variable_to_lua %}
 -- this file gets written automatically by the Archipelago Randomizer and is in its raw form a Jinja2 Template
 require('lib')
 data.raw["item"]["rocket-part"].hidden = false
@@ -138,10 +138,10 @@ function set_ap_unimportant_icon(tech)
     tech.icon_size = 128
 end
 
-function copy_factorio_icon(tech, tech_source)
-    tech.icon = table.deepcopy(technologies[tech_source].icon)
-    tech.icons = table.deepcopy(technologies[tech_source].icons)
-    tech.icon_size = table.deepcopy(technologies[tech_source].icon_size)
+function copy_factorio_icon(tech, tech_sources)
+    tech.icon = table.deepcopy(technologies[tech_sources[0]].icon)
+    tech.icons = table.deepcopy(technologies[tech_sources[0]].icons)
+    tech.icon_size = table.deepcopy(technologies[tech_sources[0]].icon_size)
 end
 
 {# This got complex, but seems to be required to hit all corner cases #}
@@ -210,17 +210,8 @@ data.raw["ammo"]["artillery-shell"].stack_size = 10
 {%- for original_tech_name in base_tech_table -%}
 technologies["{{ original_tech_name }}"].hidden = true
 technologies["{{ original_tech_name }}"].hidden_in_factoriopedia = false
-technologies["{{ original_tech_name }}"].unit =
-{
-  count_formula = "1",
-  ingredients =
-  {
-    {"automation-science-pack", 1},
-  },
-  time = 1e309
-}
-technologies["{{ original_tech_name }}"].research_trigger = nil
-technologies["{{ original_tech_name }}"].localised_name = "{{ original_tech_name }}"
+technologies["{{ original_tech_name }}"].unit = nil
+technologies["{{ original_tech_name }}"].research_trigger = {type = "scripted", localised_description = {"technology-description.ap-technology-script-trigger"}}
 {% endfor %}
 {%- for location, item in locations %}
 {#- the tech researched by the local player #}
@@ -238,9 +229,9 @@ new_tree_copy.localised_description  = {"technology-description.ap-technology-hi
 
 {%- if (location.revealed or tech_tree_information == 2) and item.name in base_tech_table -%}
 {#- copy Factorio Technology Icon #}
-copy_factorio_icon(new_tree_copy, "{{ item.name }}")
+copy_factorio_icon(new_tree_copy, ["{{ item.name }}"])
 {%- elif (location.revealed or tech_tree_information == 2) and item.name in progressive_technology_table -%}
-copy_factorio_icon(new_tree_copy, "{{ progressive_technology_table[item.name][0] }}")
+copy_factorio_icon(new_tree_copy, {{ dict_to_lua(progressive_technology_table[item.name]) }})
 {%- else -%}
 {#- use default AP icon if no Factorio graphics exist -#}
 {% if item.advancement or not tech_tree_information %}set_ap_icon(new_tree_copy){% else %}set_ap_unimportant_icon(new_tree_copy){% endif %}
