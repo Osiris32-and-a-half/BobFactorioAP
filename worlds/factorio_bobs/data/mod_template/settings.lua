@@ -44,3 +44,14 @@ data:extend({
         {% endif %}
     }
 })
+data:extend({
+    {
+        type = "string-setting",
+        name = "archipelago-progressive-technology-icons",
+        setting_type = "startup",
+        localised_name = {"mod-setting-name.archipelago-progressive-technology-icons"},
+        localised_description = {"mod-setting-description.archipelago-progressive-technology-icons"},
+        default_value = "always",
+        allowed_values = {"never", "only-own", "always"}
+    }
+})

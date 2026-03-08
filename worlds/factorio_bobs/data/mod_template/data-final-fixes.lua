@@ -1,6 +1,10 @@
-{% from "macros.lua" import dict_to_recipe, dict_to_lua, variable_to_lua %}
+{% from "macros.lua" import dict_to_recipe, variable_to_lua %}
 -- this file gets written automatically by the Archipelago Randomizer and is in its raw form a Jinja2 Template
 require('lib')
+local util = require("util")
+
+local True = true
+local False = false
 data.raw["item"]["rocket-part"].hidden = false
 data.raw["rocket-silo"]["rocket-silo"].fluid_boxes = {
     {
@@ -126,22 +130,94 @@ template_tech.prerequisites = {}
     data.raw["recipe"]["rocket-silo"].enabled = true
 {% endif %}
 
-function set_ap_icon(tech)
-    tech.icon = "__{{ mod_name }}__/graphics/icons/ap.png"
-    tech.icons = nil
-    tech.icon_size = 128
+local function set_ap_icon(tech)
+    tech.icons = {
+        {
+            icon = "__{{ mod_name }}__/graphics/icons/ap.png",
+            icon_size = 128,
+            scale = 1,
+            draw_background = true,
+        }
+    }
 end
 
-function set_ap_unimportant_icon(tech)
-    tech.icon = "__{{ mod_name }}__/graphics/icons/ap_unimportant.png"
-    tech.icons = nil
-    tech.icon_size = 128
+local function set_ap_unimportant_icon(tech)
+    tech.icons = {
+        {
+            icon = "__{{ mod_name }}__/graphics/icons/ap_unimportant.png",
+            icon_size = 128,
+            scale = 1,
+            draw_background = true,
+        }
+    }
 end
 
-function copy_factorio_icon(tech, tech_sources)
-    tech.icon = table.deepcopy(technologies[tech_sources[0]].icon)
-    tech.icons = table.deepcopy(technologies[tech_sources[0]].icons)
-    tech.icon_size = table.deepcopy(technologies[tech_sources[0]].icon_size)
+local get_icons = function (tech_name)
+    --ensure that we are working with a properly made 'icons' of a technology.
+    local tech = technologies[tech_name]
+    local icons = table.deepcopy(tech.icons)
+    if icons == nil then
+        local fragment = {icon = tech.icon, icon_size = tech.icon_size or 64}
+        icons = {fragment} --I needed two lists in one another, and because of the template I could not make it in one line. This is my solution.
+    end
+    if icons[1].draw_background == nil then
+        icons[1].draw_background = true --ensure that the shadows will be drawn as they would normally be done my default.
+    end
+    for item, _ in pairs(icons) do
+        if icons[item].scale == nil then
+            icons[item].scale = (128) / icons[item].icon_size --once again making the default value. because I am doing abnormal things. And the merging does not do this propperly.
+        end
+    end
+    return icons
+end
+
+local function copy_factorio_icon(tech, tech_sources, this_world, importance)
+    local total_amount = table_size(tech_sources)
+    tech.icons = {}
+    if this_world == false then --display transparent background for ap items not of this world.
+        if importance then
+            set_ap_icon(tech)
+        else
+            set_ap_unimportant_icon(tech)
+        end
+        tech.icons[1].tint = {r=0.7,g=0.7,b=0.7,a=0.7} --set background tint.
+    end
+    if total_amount == 1 or settings.startup["archipelago-progressive-technology-icons"].value == "never" or (this_world == false and settings.startup["archipelago-progressive-technology-icons"].value == "only-own") then
+        --only display the first of the list.
+        tech.icons = util.combine_icons(tech.icons, get_icons(tech_sources[1]), {}, nil)
+        return
+    end
+    local line_size = 1
+    while total_amount / line_size > line_size do
+        -- this is basically a square root function. I do not need more than this info. So I kept it at this.
+        line_size = line_size + 1
+    end
+    local top_layer = total_amount % line_size --find out how many icons need to be placed on the top layer.
+    local full_layers = math.floor(total_amount / line_size) -- find out how many row of icons I have of line_size.
+    local all_layers_shift_pre_calc = -0.5 * (full_layers - 1) - 1 --how much higher the start of the full layers needs to be to fit everything. (only full layers. top layer gets take care of later.)
+    local icon_pixel_size = 96/line_size --128 is to get the icons to just touch on the sides. 64 is twice as big. 96 is recommended and 1.5 times the size.
+    local inputs = {} -- need this to tell the merger of icons how things need to be merged. Only affects the second icons in the function.
+    inputs.scale = 1/line_size
+    local icon_processing = 0 --the position in the full tech_sources list I am currently processing.
+    if top_layer > 0 then
+        all_layers_shift_pre_calc = -0.5 * full_layers --change the full layers shift because of this extra layer.
+        local vertical_shift = (-0.5 * full_layers) * icon_pixel_size --figure out the current layer.
+        for icon_location = 1, top_layer, 1 do
+            icon_processing = icon_processing + 1
+            local icons = get_icons(tech_sources[icon_processing])
+            inputs.shift = {(-0.5 * (top_layer - 1) + icon_location - 1) * icon_pixel_size, vertical_shift}
+            tech.icons = util.combine_icons(tech.icons, icons, inputs, nil)
+        end
+    end
+    for line = 1, full_layers, 1 do
+        local vertical_shift = (all_layers_shift_pre_calc + line) * icon_pixel_size
+        for icon_location = 1, line_size, 1 do
+            icon_processing = icon_processing + 1
+            local icons = get_icons(tech_sources[icon_processing])
+            inputs.shift = {(-0.5 * (line_size - 1) + icon_location - 1) * icon_pixel_size, vertical_shift}
+            tech.icons = util.combine_icons(tech.icons, icons, inputs, nil)
+        end
+    end
 end
 
 {# This got complex, but seems to be required to hit all corner cases #}
@@ -229,9 +305,9 @@ new_tree_copy.localised_description  = {"technology-description.ap-technology-hi
 
 {%- if (location.revealed or tech_tree_information == 2) and item.name in base_tech_table -%}
 {#- copy Factorio Technology Icon #}
-copy_factorio_icon(new_tree_copy, ["{{ item.name }}"])
+copy_factorio_icon(new_tree_copy, {"{{ item.name }}"}, {{item.player == slot_player}}, {{item.advancement}})
 {%- elif (location.revealed or tech_tree_information == 2) and item.name in progressive_technology_table -%}
-copy_factorio_icon(new_tree_copy, {{ dict_to_lua(progressive_technology_table[item.name]) }})
+copy_factorio_icon(new_tree_copy, {{ variable_to_lua(progressive_technology_table[item.name]) }}, {{item.player == slot_player}}, {{item.advancement}})
 {%- else -%}
 {#- use default AP icon if no Factorio graphics exist -#}
 {% if item.advancement or not tech_tree_information %}set_ap_icon(new_tree_copy){% else %}set_ap_unimportant_icon(new_tree_copy){% endif %}
