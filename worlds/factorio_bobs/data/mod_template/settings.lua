@@ -51,7 +51,7 @@ data:extend({
         setting_type = "startup",
         localised_name = {"mod-setting-name.archipelago-progressive-technology-icons"},
         localised_description = {"mod-setting-description.archipelago-progressive-technology-icons"},
-        default_value = "always",
+        default_value = "only-own",
         allowed_values = {"never", "only-own", "always"}
     }
 })
