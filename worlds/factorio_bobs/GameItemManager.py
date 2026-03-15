@@ -25,9 +25,9 @@ class DefinitionSource(Enum):
     WORLD = 4
 
 class RecipeEngineType:
-    def __init__(self, ctx: RecipeEngine, name: str, source: DefinitionSource):
+    def __init__(self, ctx: GameItemManager, name: str, source: DefinitionSource):
         self.name: str = name
-        self.ctx: RecipeEngine = ctx
+        self.ctx: GameItemManager = ctx
         self.source: DefinitionSource = source
         if source == DefinitionSource.IMPLIED:
             ctx.modpack.logger.warning(f"{repr(self)}: is implied more strictly define")
@@ -35,7 +35,7 @@ class RecipeEngineType:
     def __repr__(self) -> str:
         return f"{type(self).__name__}(name={self.name}, ctx={self.ctx.name})"
 
-class RecipeEngine:
+class GameItemManager:
     invalidate_cache = False
 
     def __init__(self, modpack: "FactorioModpack"):
@@ -73,7 +73,7 @@ class RecipeEngine:
         for item_name in non_randomizable_items:
             self.get_game_item(item_name).is_valid_pool = False
 
-        if RecipeEngine.invalidate_cache:
+        if GameItemManager.invalidate_cache:
             return
 
         try:
@@ -430,7 +430,7 @@ class RecipeEngine:
 
 
 class GameItem(RecipeEngineType):
-    def __init__(self, ctx: RecipeEngine, name: str, source: DefinitionSource,
+    def __init__(self, ctx: GameItemManager, name: str, source: DefinitionSource,
                  is_fluid: bool = False):
         super().__init__(ctx, name, source)
         self.is_fluid = is_fluid
@@ -510,7 +510,7 @@ class GameItem(RecipeEngineType):
 
 
 class GameRecipe(RecipeEngineType):
-    def __init__(self, ctx: RecipeEngine, name: str, source: DefinitionSource, category: Category | str,
+    def __init__(self, ctx: GameItemManager, name: str, source: DefinitionSource, category: Category | str,
                  ingredients: dict[GameItem | str, float], products: dict[GameItem | str, float], energy: float):
         super().__init__(ctx, name, source)
 
@@ -591,7 +591,7 @@ class GameRecipe(RecipeEngineType):
 
 
 class Catalyst(RecipeEngineType):
-    def __init__(self, ctx: RecipeEngine, name: str, source: DefinitionSource):
+    def __init__(self, ctx: GameItemManager, name: str, source: DefinitionSource):
         super().__init__(ctx, name, source)
         self.has_calculated_raw: bool = False
         self.is_valid: bool = True
@@ -602,13 +602,13 @@ class Catalyst(RecipeEngineType):
 
 
 class ItemCatalyst(Catalyst):
-    def __init__(self, ctx: RecipeEngine, name: str, source: DefinitionSource):
+    def __init__(self, ctx: GameItemManager, name: str, source: DefinitionSource):
         super().__init__(ctx, name, source)
         self.item: GameItem | None = None
 
 
 class Category(ItemCatalyst):
-    def __init__(self, ctx: RecipeEngine, name: str, source: DefinitionSource):
+    def __init__(self, ctx: GameItemManager, name: str, source: DefinitionSource):
         super().__init__(ctx, name, source)
         self.machines: set[GameItem] = set()
         self.manual = False
@@ -621,7 +621,7 @@ class OneItemCatalyst(ItemCatalyst):
         self.item = item
 
 class TechCatalyst(Catalyst):
-    def __init__(self, ctx: RecipeEngine, source: DefinitionSource, tech: Technology):
+    def __init__(self, ctx: GameItemManager, source: DefinitionSource, tech: Technology):
         super().__init__(ctx, tech.name, source)
         self.tech = tech
         self.req_techs = {self}

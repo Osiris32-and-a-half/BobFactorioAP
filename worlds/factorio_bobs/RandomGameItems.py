@@ -1,8 +1,8 @@
 import bisect
 import random
-from typing import TYPE_CHECKING, Iterator, Iterable
+from typing import TYPE_CHECKING, Iterable
 
-from .RecipeEngine import RecipeEngine, GameItem
+from .GameItemManager import GameItemManager, GameItem
 
 if TYPE_CHECKING:
     from . import FactorioBobs
@@ -15,7 +15,7 @@ class RandomGameItems:
         self.taken: dict[GameItem, int] = {} # item to pool taken from
 
     @property
-    def recipe_engine(self) -> RecipeEngine:
+    def recipe_engine(self) -> GameItemManager:
         return self.world.modpack.recipe_engine
 
     @property

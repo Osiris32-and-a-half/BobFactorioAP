@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import FrozenSet, Any
 
 import Utils
-from .RecipeEngine import RecipeEngine
+from .GameItemManager import GameItemManager
 from .Technologies import Technology
 from .APModpackManager import BaseModpack
 
@@ -29,7 +29,7 @@ class FactorioModpack(BaseModpack):
         self.__removed_technologies: set[str] | None = None
         self.__required_technologies: dict[str, FrozenSet[Technology]] | None = None
 
-        self.__recipe_engine: RecipeEngine | None = None
+        self.__recipe_engine: GameItemManager | None = None
 
         self.__forced_locations: dict[str, int] | None = None
 
@@ -91,7 +91,7 @@ class FactorioModpack(BaseModpack):
 
         self.__required_technologies: dict[str, FrozenSet[Technology]] = (
             Utils.KeyedDefaultDict(lambda ingredient_name:
-                                   frozenset(self.recipe_engine.all_ingredients[ingredient_name].all_unlocking_technologies())))
+                                   frozenset(self.recipe_engine.game_items[ingredient_name].all_unlocking_technologies())))
         self.__required_technologies["water"] = frozenset()
 
         self.__base_technology_table = self.__technology_table.copy()
@@ -217,9 +217,9 @@ class FactorioModpack(BaseModpack):
         return useless_overrides
 
     @property
-    def recipe_engine(self) -> RecipeEngine:
+    def recipe_engine(self) -> GameItemManager:
         if self.__recipe_engine is None:
-            self.__recipe_engine = RecipeEngine(self)
+            self.__recipe_engine = GameItemManager(self)
         return self.__recipe_engine
 
     @cached_property
