@@ -12,7 +12,7 @@
 --      hints will only be send once. Unless an achipelago command demands the whole list.
 
 
-local constants = require("constants")
+local general = require("Archipelago/general")
 
 local function send_hint(technologies, force)
     --technologies => tech_name = true
@@ -23,11 +23,10 @@ local function send_hint(technologies, force)
         end
         if storage.hinted_techs[tech_name] == false then
             storage.hinted_techs[tech_name] = true
-            if constants.hint_tech_list[tech_name] then
+            if general.technologies.hint_list[tech_name] then
                 reveal_string = reveal_string .. " " .. tech_name
-                -- send a hint to the archipelago server here.
+                -- add to hints for the the AP client.
             end
-
         end
     end
     if reveal_string ~= "" then 
@@ -69,7 +68,7 @@ local function depth_check(force, in_layer)
     end
 
     local to_check = table.deepcopy(in_depth)
-    local depth_measure = settings.global[constants.setting_names.depth_obscurity].value
+    local depth_measure = settings.global[general.mod_setting_names.depth_obscurity].value
     local first_round = true
     while depth_measure > 0 do
         depth_measure = depth_measure - 1
@@ -146,13 +145,13 @@ local function update_science_tech_tree(force)
 
     local to_reveal
 
-    if settings.global[constants.setting_names.layer_obscurity].value then
+    if settings.global[general.mod_setting_names.layer_obscurity].value then
         to_reveal = layer_check(force)
     else
         to_reveal = table.deepcopy(hidden_science_tech) or {}
     end
     
-    if settings.global[constants.setting_names.depth_obscurity].value >=1 then
+    if settings.global[general.mod_setting_names.depth_obscurity].value >=1 then
         to_reveal = depth_check(force, to_reveal)
     end
 
@@ -242,7 +241,7 @@ local function setup_storage(force)
     for name, tech in pairs(game.forces[force.name].technologies) do
         if tech.prototype.hidden == false then
             if tech.prototype.research_trigger == nil then
-                if settings.global[constants.setting_names.layer_obscurity].value or settings.global[constants.setting_names.depth_obscurity].value>=1 then
+                if settings.global[general.mod_setting_names.layer_obscurity].value or settings.global[general.mod_setting_names.depth_obscurity].value>=1 then
                     hidden_science_tech[tech.name] = true
                     for _, packs in pairs(tech.research_unit_ingredients) do
                         if done_packs[packs.name] ~= true then
@@ -253,7 +252,7 @@ local function setup_storage(force)
                     tech.enabled = false
                 end
             elseif tech.prototype.research_trigger and (tech.prototype.research_trigger.type == "craft-item" or tech.prototype.research_trigger.type == "craft-fluid") then
-                if settings.global[constants.setting_names.craft_obscurity].value then
+                if settings.global[general.mod_setting_names.craft_obscurity].value then
                 
                     local trigger_name
                     if tech.prototype.research_trigger.type == "craft-item" then
@@ -278,18 +277,18 @@ local function setup_storage(force)
 end
 
 local function on_research_finished(event)
-    for _, pack_name in pairs(constants.science_packs) do
+    for _, pack_name in pairs(general.science_packs.ordered) do
         if event.research.name == "achipellago-trigger-"..pack_name then
             storage.forces[event.research.force.name].science_packs_name[pack_name].crafted  = true
-            if constants.GOAL == 1 and constants.goal_science_pack == pack_name then
-                game.set_game_state
-                {
-                    game_finished = true,
-                    player_won = true,
-                    can_continue = true,
-                    victorious_force = event.research.force
-                }
-            end
+            --if constants.GOAL == 1 and constants.goal_science_pack == pack_name then --the goal is to craft the "goal_science_pack" which is not implemented.
+            --    game.set_game_state
+            --    {
+            --        game_finished = true,
+            --        player_won = true,
+            --        can_continue = true,
+            --        victorious_force = event.research.force
+            --    }
+            --end
         end
     end
     update_science_tech_tree(event.research.force)
@@ -376,8 +375,6 @@ end
 local function on_configuration_changed()
     game.print("I see that you have changed your configuration.\n But as I was not asked I am going to ignore anything extra. And probably give errors on removed techs.\n~~the tech obscurity of the archipelago mod")
 end
-
-
 
 commands.add_command("ap-receive-hint", "Used by the Archipelago client to manage the tech tree hints", function(call)
 
