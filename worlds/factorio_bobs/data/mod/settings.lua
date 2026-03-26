@@ -43,5 +43,30 @@ data:extend({
         localised_description = {"mod-setting-description.archipelago-progressive-technology-icons"},
         default_value = "only-own",
         allowed_values = {"never", "only-own", "always"}
+    },
+    {
+        type = "bool-setting",
+        name = general.mod_setting_names.layer_obscurity,
+        localised_name = {"mod-setting-name.archipelago-tech-layer-obscurity"},
+        localised_description = {"mod-setting-description.archipelago-tech-layer-obscurity"},
+        setting_type = "runtime-global",
+        default_value = general.mod_setting_defaults.energy_link
+    },
+    {
+        type = "int-setting",
+        name = general.mod_setting_names.depth_obscurity,
+        localised_name = {"mod-setting-name.archipelago-tech-depth-obscurity"},
+        localised_description = {"mod-setting-description.archipelago-tech-depth-obscurity"},
+        setting_type = "runtime-global",
+        minimum_value = 0,
+        default_value = general.mod_setting_defaults.energy_link
+    },
+    {
+        type = "bool-setting",
+        name = general.mod_setting_names.craft_obscurity,
+        localised_name = {"mod-setting-name.archipelago-tech-craft-obscurity"},
+        localised_description = {"mod-setting-description.archipelago-tech-craft-obscurity"},
+        setting_type = "runtime-global",
+        default_value = general.mod_setting_defaults.energy_link
     }
 })
