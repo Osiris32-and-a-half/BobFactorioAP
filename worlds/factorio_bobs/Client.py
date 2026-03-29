@@ -226,8 +226,9 @@ class FactorioContext(CommonContext):
         commands = {}
         index = 0
         for position in range(len(self.stored_data[f"_read_hints_{self.team}_{self.slot}"])):
-            if self.stored_data[f"_read_hints_{self.team}_{self.slot}"][position]["receiving_player"] == self.slot:
-                self.rcon_client.send_command( f'/ap-receive-hint ap-{self.stored_data[f"_read_hints_{self.team}_{self.slot}"][position]["location"]}-')
+            hint = self.stored_data[f"_read_hints_{self.team}_{self.slot}"][position]
+            if hint["finding_player"] == self.slot and not hint["found"]:
+                self.rcon_client.send_command( f'/ap-receive-hint ap-{hint["location"]}-')
             index +=1
         if commands:
             self.rcon_client.send_commands(commands)
@@ -297,10 +298,10 @@ class FactorioContext(CommonContext):
                     already_hinted = False
                     if self.stored_data[f"_read_hints_{self.team}_{self.slot}"]:
                         for hint in self.stored_data[f"_read_hints_{self.team}_{self.slot}"]:
-                            if hint["location"] == location_id:
+                            if hint["location"] == location_id and hint["finding_player"] == self.slot:
                                 already_hinted = True
                     
-                    if already_hinted:
+                    if not already_hinted:
                         techs_to_hint.append(location_id)
                         if self.silence_rebounce_toggle:
                             self.silence_rebounce_hints.append(location_id)
