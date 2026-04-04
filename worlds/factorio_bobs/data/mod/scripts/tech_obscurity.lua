@@ -62,7 +62,7 @@ local function depth_check(force, in_layer)
             prerequisite = false
             break
         end
-        if prerequisite and tech.prototype.research_trigger == nil and in_layer[tech.name] then
+        if prerequisite and tech.prototype.research_trigger == nil and in_layer[tech.name] and not tech.researched then
             second_pass[tech.name] = true
         end
     end
@@ -94,16 +94,26 @@ local function depth_check(force, in_layer)
         end
 
         local nothing_new = true
-        for _, _ in pairs(new_revealed) do
-            nothing_new = false
-            break
+        local and_logic = {}
+        for name, _ in pairs(new_revealed) do
+            local in_sight = true
+            for _, tech in pairs(technologies[name].prerequisites) do
+                if (not in_depth[tech.name]) then
+                    in_sight = false
+                    break
+                end
+            end
+            if in_sight then
+                and_logic[name] = true
+                nothing_new = false
+            end
         end
         if nothing_new then
             break -- nothing new found. So no need to continue the search.
         end
 
         --set the next layer of techs at the ready. And mark all other techs for reveal.
-        for name, _ in pairs(new_revealed) do
+        for name, _ in pairs(and_logic) do
             to_check[name] = true
             in_depth[name] = true
         end
@@ -239,7 +249,7 @@ local function setup_storage(force)
     local done_triggers = {}
 
     for name, tech in pairs(game.forces[force.name].technologies) do
-        if tech.prototype.hidden == false then
+        if tech.prototype.hidden == false and tech.prototype.name ~= "crash-prevention" then
             if tech.prototype.research_trigger == nil then
                 if settings.global[general.mod_setting_names.layer_obscurity].value or settings.global[general.mod_setting_names.depth_obscurity].value>=1 then
                     hidden_science_tech[tech.name] = true
