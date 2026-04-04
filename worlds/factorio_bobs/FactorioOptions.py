@@ -142,7 +142,7 @@ class TechLayerObscurity(Toggle):
     If information is Full, then this will also hide the hints.
     Works alone or in combination with Depth Obscurity."""
     display_name = "Tech Layer Obscurity"
-    default = True
+    default = False
     disabled = False
     enabled = True
 
@@ -165,7 +165,7 @@ class TechDepthObscurity(Range):
     If information is Full, then this will also hide the hints.
     Works alone or in combination with Layer Obscurity."""
     display_name = "Tech Depth Obscurity"
-    default = 1
+    default = 2
     option_disabled = 0
     disabled = 0
     range_start = 0
