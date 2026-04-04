@@ -1,4 +1,7 @@
-from ..RecipeEngineCore import RecipeEngineCore
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..RecipeEngineCore import RecipeEngineCore
 
 
 class AbstractNodeContainer:
