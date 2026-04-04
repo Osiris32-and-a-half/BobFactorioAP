@@ -138,6 +138,7 @@ class TechLayerObscurity(Toggle):
     """Hides technologies based on what science packs you have crafted.
     on: If you have crafted Automation (red) science. You can only view technologies that require Automation (red) science.
     off: Even if you have crafted only Automation (red) science. You can still see technologies that require Utility (yellow) science.
+    Warning; no technology will be visible at the start of the game. You need to craft a red science pack to view any technologies.
     If information is Full, then this will also hide the hints.
     Works alone or in combination with Depth Obscurity."""
     display_name = "Tech Layer Obscurity"
@@ -159,8 +160,8 @@ class TechDepthObscurity(Range):
     F
     Only A is researched.
     0: disabled. This feature shuts of at 0.
-    1: You only see sciences that are one step away from what you have researched so far. In the example above. This will be B, D and E. (Note, E still needs C to be researched. But C is not yet visable.)
-    2: You will see techs that are two steps away from all the tech you have researched. In the example above this is all techs.
+    1: You only see sciences that are one step away from what you have researched so far. In the example above. This will be B and D. (Note, E needs C to be researched.)
+    2: You will see techs that are two steps away from all the tech you have researched. In the example above this is A, B, C, D and F. (E is still not visible.)
     If information is Full, then this will also hide the hints.
     Works alone or in combination with Layer Obscurity."""
     display_name = "Tech Depth Obscurity"
