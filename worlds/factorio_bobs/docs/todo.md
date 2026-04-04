@@ -46,15 +46,24 @@ if you pick one up and then decide to do something else, add research notes here
 # fluid temperature
 - needs to be added to extractor
 - how minimum (and maximum?) defined in recipes
-- is temperature just multiple different "items"
+- is temperature just multiple different "items?"
 
 # energy sources and uses
 - `void` is no energy source needed
 - can custom be defined?
 
+# add auto place objects to logic
+- would be manual level recipe only
+- https://discord.com/channels/731205301247803413/1475714948608036977/1482592095372967938
+
 # infinite research
 - already (mostly) extracted (extract max level instead?)
 - how options?
+
+# custom goals
+- define requirement for modded goals in same format as additional logic?
+- custom machine?
+- obtain a specific item?
 
 # ability to remove recipes/items
 - automatically remove all other science recipes?
@@ -62,3 +71,8 @@ if you pick one up and then decide to do something else, add research notes here
 # add better error message when save file creation fails
 - this may be any complete failure to load factorio
 - https://discord.com/channels/731205301247803413/1426234278462750860/1471984620550492272
+
+# more pool generation options
+- pool generation based of the original core where pools are defined by exponential limits
+- add an option to exclude items from being in science below a specific pack
+  - you would have to search each pool for invalid item and then exchange them for the items at the bottom of the pool above ensuring that you don't exchange invalid items
