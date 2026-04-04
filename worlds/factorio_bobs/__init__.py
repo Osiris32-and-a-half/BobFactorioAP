@@ -19,7 +19,7 @@ from .FactorioOptions import (FactorioOptions, Silo, Satellite, TechTreeInformat
                               TechLayerObscurity, TechDepthObscurity, TechCostDistribution, option_groups)
 from .FactorioRules import InternalItemRule, TechRule, AndRule, OrRule, process_yaml_rule, Rule
 from .RandomGameItems import RandomGameItems
-from .RecipeEngine import GameRecipe, GameItem, DefinitionSource, TechCatalyst, Category, OneItemCatalyst
+from .GameItemManager import GameRecipe, GameItem, DefinitionSource, TechCatalyst, Category, OneItemCatalyst
 from .Shapes import get_shapes
 from .FactorioSettings import FactorioSettings
 from .Technologies import Technology

@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from worlds.AutoWorld import World
 
 from . import Technologies, FactorioModpack
-from .RecipeEngine import GameItem, GameRecipe
+from .GameItemManager import GameItem, GameRecipe
 
 if TYPE_CHECKING:
     from . import FactorioBobs

@@ -32,11 +32,11 @@ class Node:
     def valid_with(self, nodes: set["Node"]) -> bool:
         return False
 
-    def add_used_by(self, node: "Node", quantity: float):
+    def add_used_by(self, node: "Node", quantity: float|None):
         self._add_used_by(node, quantity)
         node._add_required(self)
 
-    def _add_used_by(self, node: "Node", quantity: float):
+    def _add_used_by(self, node: "Node", quantity: float|None):
         if node in self.used_by:
             raise RuntimeError(f"{self} tried to add {node} when it's already used")
         self.used_by[node] = quantity
@@ -53,9 +53,12 @@ class Node:
             raise RuntimeError(f"{self} tried to remove {node} when it's not used")
         del self.used_by[node]
 
-    def add_required(self, node: "Node", quantity: float):
+    def add_required(self, node: "Node", quantity: float|None):
         self._add_required(node)
-        node._add_used_by(self, 1/quantity)
+        if quantity is None or quantity == 0:
+            node._add_used_by(self, None)
+        else:
+            node._add_used_by(self, 1/quantity)
 
     def _add_required(self, node: "Node"):
         if node in self.required:
