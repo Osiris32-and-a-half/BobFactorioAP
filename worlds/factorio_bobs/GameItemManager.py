@@ -5,6 +5,9 @@ import math
 from enum import Enum
 from typing import TYPE_CHECKING, TypeVar
 
+from .RecipeEngine.Nodes import ItemNode, AndNode, RecipeNode
+from .RecipeEngine.RecipeEngineCore import RecipeEngineCore
+
 try:
     import pulp
 except ImportError:
@@ -41,6 +44,7 @@ class GameItemManager:
     def __init__(self, modpack: "FactorioModpack"):
         self.modpack = modpack
         self.name = self.modpack.packName
+        self.recipe_engine = RecipeEngineCore()
 
         self.has_init = False
 
@@ -65,31 +69,30 @@ class GameItemManager:
         self.__register_recipes()
         self.__link_technologies()
         self.__load_settings()
-        self.__remove_bad_items()
 
         goal_items = {"rocket-part", "satellite", "rocket-silo"}
-        non_randomizable_items = set(self.modpack.ordered_science_packs) | goal_items
+        randomizable_items = set(self.modpack.ordered_science_packs) | goal_items
 
-        for item_name in non_randomizable_items:
+        for item_name in randomizable_items:
             self.get_game_item(item_name).is_valid_pool = False
-
-        if GameItemManager.invalidate_cache:
-            return
-
-        try:
-            with self.modpack.open_file("Cache/precalc.json") as file:
-                raw_logic_pre_compute = json.load(file)
-            for name, data in raw_logic_pre_compute.items():
-                item = self.get_game_item(name)
-                item.has_calculated_raw = True
-                if "invalid" in data:
-                    if item.name not in {"space-science-pack"}:
-                        item.set_invalid()
-                    continue
-                item.best_recipes = {self.recipes[name] for name in data["recipes"]}
-                item.score = data["score"]
-        except FileNotFoundError:
-            pass
+        #
+        # if GameItemManager.invalidate_cache:
+        #     return
+        #
+        # try:
+        #     with self.modpack.open_file("Cache/precalc.json") as file:
+        #         raw_logic_pre_compute = json.load(file)
+        #     for name, data in raw_logic_pre_compute.items():
+        #         item = self.get_game_item(name)
+        #         item.has_calculated_raw = True
+        #         if "invalid" in data:
+        #             if item.name not in {"space-science-pack"}:
+        #                 item.set_invalid()
+        #             continue
+        #         item.best_recipes = {self.recipes[name] for name in data["recipes"]}
+        #         item.score = data["score"]
+        # except FileNotFoundError:
+        #     pass
 
 
     def __register_game_items(self) -> None:
@@ -435,6 +438,9 @@ class GameItem(RecipeEngineType):
         super().__init__(ctx, name, source)
         self.is_fluid = is_fluid
 
+        self.node = ItemNode(f"Item: {name}")
+        ctx.recipe_engine.add_node(self.node)
+
         self.has_calculated_raw: bool = False
         self.best_recipes: set[GameRecipe] = set()
         self.score: float = float("inf")
@@ -513,41 +519,52 @@ class GameRecipe(RecipeEngineType):
     def __init__(self, ctx: GameItemManager, name: str, source: DefinitionSource, category: Category | str,
                  ingredients: dict[GameItem | str, float], products: dict[GameItem | str, float], energy: float):
         super().__init__(ctx, name, source)
-
-        self.has_calculated_raw: bool = False
-        self.is_valid: bool = True
-
-        self.is_starter: bool = name in ctx.modpack.start_unlocked_recipes
-
+        self.node = RecipeNode(f"Recipe: {name}")
+        ctx.recipe_engine.add_node(self.node)
         self.ingredients: dict[GameItem, float] = {ctx.get_game_item(ingredient, source): amount
                                                    for ingredient, amount in ingredients.items()}
         self.products: dict[GameItem, float] = {ctx.get_game_item(product, source): amount
                                                 for product, amount in products.items()}
-        self.energy = energy
-        self.technologies: set[TechCatalyst] = set()
-        self.category: Category = ctx.get_category(category)
-        self.needed_items: set[ItemCatalyst] = set()
 
-        self.productivity: bool | None = None # ternary set to override default
+        self.energy = energy
 
         if not self.ingredients:
             self.cost: float = self.energy
         else:
             self.cost: float = float("inf")
 
-        for ingredient, amount in self.ingredients.copy().items():
-            if not ingredient.is_valid:
-                self.is_valid = False
-            if ingredient not in self.products:
+        true_ingredient = self.ingredients.copy()
+        true_products = self.products.copy()
+        for ingredient, amount in true_ingredient.copy().items():
+            if ingredient not in true_products:
                 continue
-            new_amount = self.products[ingredient] - amount
+            new_amount = true_products[ingredient] - amount
             if new_amount >= 0:
-                del self.ingredients[ingredient]
-                self.needed_items.add(ctx.get_item_catalyst(ingredient))
-                self.products[ingredient] = new_amount
+                true_ingredient[ingredient] = 0
+                true_products[ingredient] = new_amount
             else:
-                del self.products[ingredient]
-                self.ingredients[ingredient] = -new_amount
+                del true_products[ingredient]
+                true_ingredient[ingredient] = -new_amount
+
+        for ingredient, amount in true_ingredient.items():
+            self.node.add_required(ingredient.node, amount)
+
+        for product, amount in true_products.items():
+            self.node.add_used_by(product.node, amount)
+
+        self.category: Category = ctx.get_category(category)
+
+        self.node.add_required(self.category.node, 0)
+
+        self.has_calculated_raw: bool = False
+        self.is_valid: bool = True
+
+        self.is_starter: bool = name in ctx.modpack.start_unlocked_recipes
+
+        self.technologies: set[TechCatalyst] = set()
+        self.needed_items: set[ItemCatalyst] = set()
+
+        self.productivity: bool | None = None # ternary set to override default
 
         if self.source == DefinitionSource.WORLD:
             for ingredient in self.ingredients:
@@ -610,8 +627,31 @@ class ItemCatalyst(Catalyst):
 class Category(ItemCatalyst):
     def __init__(self, ctx: GameItemManager, name: str, source: DefinitionSource):
         super().__init__(ctx, name, source)
+        self.node = AndNode(f"Category :{name}")
+        ctx.recipe_engine.add_node(self.node)
+
         self.machines: set[GameItem] = set()
         self.manual = False
+
+    @property
+    def manual(self):
+        return self._manual
+
+    @manual.setter
+    def manual(self, value):
+        self._manual = value
+        self.node.manual = value
+
+    @property
+    def machines(self):
+        return self._machines
+
+    @machines.setter
+    def machines(self, value: set[GameItem]):
+        self._machines = value
+        self.node.remove_required()
+        for machine in value:
+            self.node.add_required(machine.node, 1)
 
 
 class OneItemCatalyst(ItemCatalyst):
