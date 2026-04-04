@@ -1,5 +1,4 @@
-class LogicContainer:
-    LOGIC_NAME = "Generic"
+from .Logics.Abstract import AbstractNodeContainer
 
 
 class Node:
@@ -19,7 +18,7 @@ class Node:
         self.cost = 0
 
         # A location for logic to store information per node
-        self.logic: dict[str, LogicContainer] = {}
+        self.logic: dict[str, AbstractNodeContainer] = {}
         for logic_container_class in Node.LOGIC_CONTAINER_CLASSES:
             self.logic[logic_container_class.LOGIC_NAME] = logic_container_class()
 
