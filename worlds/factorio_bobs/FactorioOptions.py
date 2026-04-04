@@ -138,7 +138,7 @@ class TechLayerObscurity(Toggle):
     """Hides technologies based on what science packs you have crafted.
     on: If you have crafted Automation (red) science. You can only view technologies that require Automation (red) science.
     off: Even if you have crafted only Automation (red) science. You can still see technologies that require Utility (yellow) science.
-    Warning; no technology will be visible at the start of the game. You need to craft a red science pack to view any technologies.
+    WARNING: no technology will be visible at the start of the game. You need to craft a red science pack to view any technologies.
     If information is Full, then this will also hide the hints.
     Works alone or in combination with Depth Obscurity."""
     display_name = "Tech Layer Obscurity"
