@@ -1,2 +1,4 @@
 factorio-rcon-py>=2.1.2
 pulp>=3.3.0
+dash_cytoscape>=1.0.2
+dash>=4.1.0
