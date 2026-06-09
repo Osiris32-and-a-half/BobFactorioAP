@@ -206,7 +206,7 @@ def generate_mod(world: "FactorioBobs", output_directory: str):
 
     info = copy.deepcopy(base_info)
     info["name"] = mod_name
-    info["dependencies"].extend([dep_name for dep_name in world.modpack.mod_settings])
+    info["dependencies"].extend(world.modpack.mod_versions)
     mod.writing_tasks.append(lambda: (versioned_mod_name + "/info.json",
                                       json.dumps(info, indent=4)))
 

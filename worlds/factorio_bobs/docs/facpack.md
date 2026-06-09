@@ -142,6 +142,14 @@ JSON list containing all science packs in the order they are to be obtained
 ```
 ## Optional files
 
+### Extractor/modVersions.json
+
+This file is an array of
+[mod dependency specifications](https://lua-api.factorio.com/latest/auxiliary/mod-structure.html#Dependency)
+which you may want to tighten or loosen as appropriate.
+
+In particular, you should add "!space-age" unless you have fully developed planetary logistics item/location logic.
+
 ### customRecipes.json
 recipe name must follow factorio requirements:
 - Only characters A-Z a-z 0-9 _- are allowed.

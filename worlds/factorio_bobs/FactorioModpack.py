@@ -250,6 +250,15 @@ class FactorioModpack(BaseModpack):
             mod_settings_raw = json.load(file)
         return mod_settings_raw
 
+    @cached_property
+    def mod_versions(self) -> list[str]:
+        """
+        Returns list[FactorioDependencySpec].
+        """
+        with self.open_file("Extractor/modVersions.json") as file:
+            mod_versions_raw = json.load(file)
+        return mod_versions_raw
+
     @property
     def forced_locations(self) -> dict[str, int]:
         if self.__forced_locations is None:
