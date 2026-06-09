@@ -1,0 +1,20 @@
+[
+  "bobassembly = 2.0.5",
+  "bobelectronics = 2.0.5",
+  "bobenemies = 2.0.4",
+  "bobequipment = 2.0.3",
+  "bobgreenhouse = 2.0.3",
+  "bobinserters = 2.0.3",
+  "boblibrary = 2.0.3",
+  "boblogistics = 2.0.6",
+  "bobmining = 2.0.4",
+  "bobmodules = 2.0.6",
+  "bobores = 2.0.3",
+  "bobplates = 2.0.5",
+  "bobpower = 2.0.4",
+  "bobrevamp = 2.0.5",
+  "bobtech = 2.0.5",
+  "bobvehicleequipment = 2.0.4",
+  "bobwarfare = 2.0.5",
+  "!space-age"
+]
