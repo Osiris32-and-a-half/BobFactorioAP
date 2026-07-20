@@ -217,20 +217,22 @@ local function on_research_finished(event)
         for _, effect in pairs(technology.prototype.effects) do
             if effect.type == "unlock-recipe" then
                 local recipe = prototypes.recipe[effect.recipe]
-                for _, result in pairs(recipe.products) do
-                    if result.type == "item" and result.amount then
-                        local name = result.name
-                        if general.free_samples.get_black_list[name] ~= true then
-                            local count
-                            if general.free_samples.state == 1 then
-                                count = result.amount
-                            else
-                                count = library.get_any_stack_size(result.name)
-                                if general.free_samples.state == 2 then
-                                    count = math.ceil(count / 2)
+                if recipe.hidden == false then
+                    for _, result in pairs(recipe.products) do
+                        if result.type == "item" and result.amount then
+                            local name = result.name
+                            if general.free_samples.get_black_list[name] ~= true then
+                                local count
+                                if general.free_samples.state == 1 then
+                                    count = result.amount
+                                else
+                                    count = library.get_any_stack_size(result.name)
+                                    if general.free_samples.state == 2 then
+                                        count = math.ceil(count / 2)
+                                    end
                                 end
+                                add_samples(technology.force, name, count)
                             end
-                            add_samples(technology.force, name, count)
                         end
                     end
                 end
