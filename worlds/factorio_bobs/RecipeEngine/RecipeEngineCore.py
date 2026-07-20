@@ -7,7 +7,7 @@ class RecipeEngineCore:
     logics: dict[str, type[AbstractLogic]] = {}
 
     def __init__(self):
-        self.nodes = {}
+        self.nodes: dict[str, Node] = {}
 
     @staticmethod
     def register_logic(logicClass: type[AbstractLogic]):
