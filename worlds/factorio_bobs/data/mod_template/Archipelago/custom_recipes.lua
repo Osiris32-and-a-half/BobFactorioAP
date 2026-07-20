@@ -1,4 +1,4 @@
-{% from "macros.lua" import dict_to_recipe, dict_to_lua, variable_to_lua %}
+{% from "macros.lua" import dict_to_recipe, dict_to_lua, variable_to_lua, set_to_categories %}
 -- this file gets written automatically by the Archipelago Randomizer and is in its raw form a Jinja2 Templates
 
 local function add_normal_custom_recipe(name, categories, energy, ingredients, products, productivity)
@@ -31,7 +31,7 @@ end
 {%- if recipe.source.value == 2 %}
 add_normal_custom_recipe(
     "{{recipe_name}}",
-    {{variable_to_lua(recipe.categories)}},
+    {{set_to_categories(recipe.categories)}},
     {{recipe.energy}},
     {{dict_to_recipe(recipe.ingredients)}},
     {{dict_to_recipe(recipe.products)}},
@@ -44,7 +44,7 @@ add_normal_custom_recipe(
 add_normal_custom_recipe(
 {# todo add check for non-standard recipe categories #}
     "{{recipe_name}}",
-    {{variable_to_lua(recipe.categories)}},
+    {{set_to_categories(recipe.categories)}},
     {{recipe.energy}},
     {{dict_to_recipe(recipe.ingredients)}},
     {{dict_to_recipe(recipe.products)}},

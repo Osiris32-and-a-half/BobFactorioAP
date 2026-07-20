@@ -79,17 +79,7 @@ end
 
 data:extend({{
         type           = "technology",
-        name           = "crash-prevention",
-        icon           = "__base__/graphics/icons/small-scorchmark.png",
-        icon_size      = 64,
-        research_trigger = {
-            type = "scripted",
-        },
-        prerequisites = {"crash-prevention-lock"}
-    },
-    {
-        type           = "technology",
-        name           = "crash-prevention-lock",
+        name           = "lock",
         hidden         = true,
         icon           = "__base__/graphics/icons/small-scorchmark.png",
         icon_size      = 64,

@@ -27,3 +27,11 @@
 {% endfor -%}
 }
 {%- endmacro %}
+
+{% macro set_to_categories(set) -%}
+{
+{%- for key in set -%}
+    "{{key.name}}",
+{%- endfor -%}
+}
+{%- endmacro %}

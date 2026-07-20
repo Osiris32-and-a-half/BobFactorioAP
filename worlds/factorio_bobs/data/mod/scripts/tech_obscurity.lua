@@ -184,7 +184,7 @@ local function update_trigger_tech_tree(force, technology)
 
     if technology == false then
         for _, recipe in pairs(prototypes.recipe) do
-            if recipe.enabled and recipe.category ~= "recycling" then
+            if recipe.enabled and recipe.hidden == false then
                 for _, item_data in pairs(recipe.products) do
                     to_check[item_data.name] = item_data.name
                 end
@@ -249,7 +249,7 @@ local function setup_storage(force)
     local done_triggers = {}
 
     for name, tech in pairs(game.forces[force.name].technologies) do
-        if tech.prototype.hidden == false and tech.prototype.name ~= "crash-prevention" then
+        if tech.prototype.hidden == false then
             if tech.prototype.research_trigger == nil then
                 if settings.global[general.mod_setting_names.layer_obscurity].value or settings.global[general.mod_setting_names.depth_obscurity].value>=1 then
                     hidden_science_tech[tech.name] = true

@@ -3,11 +3,13 @@ local general = require("Archipelago/general")
 require("Archipelago/locations")
 require("Archipelago/custom_recipes")
 
+local assembler_pictures = require("__base__.prototypes.entity.assembler-pictures")
+
 data.raw["item"]["rocket-part"].hidden = false
 data.raw["rocket-silo"]["rocket-silo"].fluid_boxes = {
     {
         production_type = "input",
-        pipe_picture = assembler2pipepictures(),
+        pipe_picture = assembler_pictures.assembler2pipepictures,
         pipe_covers = pipecoverspictures(),
         volume = 1000,
         base_area = 10,
@@ -21,7 +23,7 @@ data.raw["rocket-silo"]["rocket-silo"].fluid_boxes = {
     },
     {
         production_type = "input",
-        pipe_picture = assembler2pipepictures(),
+        pipe_picture = assembler_pictures.assembler2pipepictures,
         pipe_covers = pipecoverspictures(),
         volume = 1000,
         base_area = 10,
@@ -35,7 +37,7 @@ data.raw["rocket-silo"]["rocket-silo"].fluid_boxes = {
     },
     {
         production_type = "input",
-        pipe_picture = assembler2pipepictures(),
+        pipe_picture = assembler_pictures.assembler2pipepictures,
         pipe_covers = pipecoverspictures(),
         volume = 1000,
         base_area = 10,
