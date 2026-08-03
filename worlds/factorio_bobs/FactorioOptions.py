@@ -447,6 +447,7 @@ class CustomWorldGen(OptionDict):
             "iron-ore": {"frequency": 1, "size": 3, "richness": 6},
             "stone": {"frequency": 1, "size": 3, "richness": 6},
             "uranium-ore": {"frequency": 1, "size": 3, "richness": 6},
+            "tungsten-ore": {"frequency": 1, "size": 3, "richness": 6},
             "bob-bauxite-ore": {"frequency": 1, "size": 3, "richness": 6},
             "bob-gem-ore": {"frequency": 1, "size": 3, "richness": 6},
             "bob-gold-ore": {"frequency": 1, "size": 3, "richness": 6},
@@ -459,7 +460,6 @@ class CustomWorldGen(OptionDict):
             "bob-silver-ore": {"frequency": 1, "size": 3, "richness": 6},
             "bob-thorium-ore": {"frequency": 1, "size": 3, "richness": 6},
             "bob-tin-ore": {"frequency": 1, "size": 3, "richness": 6},
-            "bob-tungsten-ore": {"frequency": 1, "size": 3, "richness": 6},
             "bob-zinc-ore": {"frequency": 1, "size": 3, "richness": 6},
             # misc
             "trees": {"frequency": 1, "size": 1, "richness": 1},
