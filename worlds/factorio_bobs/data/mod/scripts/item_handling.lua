@@ -2,56 +2,15 @@
 
 local general = require("Archipelago/general")
 local library = require("libs/lib")
+local traps = require("trap_handling")
 local util = require("util")
 
-
-TRAP_TABLE = {
-["Attack Trap"] = function ()
-        game.surfaces["nauvis"].build_enemy_base(game.forces["player"].get_spawn_position(game.get_surface(1)), 25)
-    end,
-["Evolution Trap"] = function ()
-        local new_factor = game.forces["enemy"].get_evolution_factor("nauvis") +
-            (general.traps.evo_increase * (1 - game.forces["enemy"].get_evolution_factor("nauvis")))
-        game.forces["enemy"].set_evolution_factor(new_factor, "nauvis")
-        game.print({"", "New evolution factor:", new_factor})
-    end,
-["Teleport Trap"] = function()
-        for _, player in ipairs(game.forces["player"].players) do
-            if player.character then
-                library.attempt_teleport_player(player, 1)
-            end
-        end
-    end,
-["Grenade Trap"] = function ()
-        library.fire_entity_at_players("grenade", 0.1)
-    end,
-["Cluster Grenade Trap"] = function ()
-        library.fire_entity_at_players("cluster-grenade", 0.1)
-    end,
-["Artillery Trap"] = function ()
-        library.fire_entity_at_players("artillery-projectile", 1)
-    end,
-["Atomic Rocket Trap"] = function ()
-        library.fire_entity_at_players("atomic-rocket", 0.1)
-    end,
-["Atomic Cliff Remover Trap"] = function ()
-        local cliffs = game.surfaces["nauvis"].find_entities_filtered{type = "cliff"}
-
-        if #cliffs > 0 then
-            library.fire_entity_at_entities("atomic-rocket", {cliffs[math.random(#cliffs)]}, 0.1)
-        end
-    end,
-["Inventory Spill Trap"] = function ()
-        for _, player in ipairs(game.forces["player"].players) do
-            library.spill_character_inventory(player.character)
-        end
-    end,
-}
+general.technologies.progressive = general.technologies.progressive()
 
 local function receive_item(item_name, source)
     for _, force in pairs(library.get_all_ap_forces()) do
-        if general.technologies.progressive()[item_name] ~= nil then
-            local tech_stack = general.technologies.progressive()[item_name]
+        if general.technologies.progressive[item_name] ~= nil then
+            local tech_stack = general.technologies.progressive[item_name]
                 for _, item_name in ipairs(tech_stack) do
                     local tech = force.technologies[item_name]
                     if tech.researched ~= true then
@@ -70,9 +29,9 @@ local function receive_item(item_name, source)
                     tech.researched = true
                 end
             end
-        elseif TRAP_TABLE[item_name] ~= nil then
+        elseif traps.is_trap(item_name) then
             force.print({"archipelago.receive-ap-item", item_name, source})
-            TRAP_TABLE[item_name]()
+            traps.run_trap(item_name)
         else
             force.print("Unknown Item " .. item_name)
         end
@@ -120,7 +79,7 @@ local function update_player(index)
                 sent = 0
             end
             if sent > 0 then
-                player.print({"archipelago.recieve-sample-item", sent, "[item=" .. name .. ",quality="..general.free_samples.quality.."]"})
+                player.print({"archipelago.receive-sample-item", sent, "[item=" .. name .. ",quality="..general.free_samples.quality.."]"})
                 data.suppress_full_inventory_message = false
             end
             if sent ~= count then               -- Couldn't full send.
@@ -191,6 +150,8 @@ local function on_force_created(event)
 end
 
 -- hook into researches done
+general.free_samples.get_black_list = general.free_samples.get_black_list()
+general.technologies.local_items = general.technologies.local_items
 local function on_research_finished(event)
     local technology = event.research
     if library.is_valid_ap_force(technology.force) == false then
@@ -217,7 +178,7 @@ local function on_research_finished(event)
                 for _, result in pairs(recipe.products) do
                     if result.type == "item" and result.amount then
                         local name = result.name
-                        if general.free_samples.get_black_list()[name] ~= true then
+                        if general.free_samples.get_black_list[name] ~= true then
                             local count
                             if general.free_samples.state == 1 then
                                 count = result.amount
@@ -301,8 +262,6 @@ lib.events = {
     --[defines.events.on_surface_created] = on_surface_created,
     --[defines.events.on_surface_created] = on_surface_created,
 
-
-    [defines.events.on_script_path_request_finished] = library.handle_teleport_attempt
 }
 lib.on_init = on_init
 --lib.on_configuration_changed = on_configuration_changed
