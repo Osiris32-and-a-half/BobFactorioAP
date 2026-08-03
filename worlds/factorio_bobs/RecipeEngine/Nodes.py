@@ -1,7 +1,11 @@
+from typing import TypeVar, Generic
+
+from .Components.BaseComponent import BaseComponent
 from .Logics.Abstract import AbstractNodeContainer
 
+T = TypeVar("T", bound=BaseComponent)
 
-class Node:
+class Node(Generic[T]):
     LOGIC_CONTAINER_CLASSES = set()
     def __init__(self, name: str):
         self.name = name
@@ -25,6 +29,8 @@ class Node:
         # Can spontaneously crate node however all usage is classed as manual
         # usage classification changes if all `required` aren't manual and another option for the node is available when catalyst
         self.manual: bool = False
+
+        self.__components: dict[type[T], T] = {}
 
     def __repr__(self):
         return f"{type(self)}({self.name})"
@@ -77,6 +83,15 @@ class Node:
             raise RuntimeError(f"{self} tried to remove {node} when it's not required")
         self.required.remove(node)
 
+    def register_component(self, component_class: type[T], instance: T):
+        if component_class in self.__components:
+            raise RuntimeError(f"{self} tried to register {component_class} twice")
+        self.__components[component_class] = instance
+
+    def get_component(self, component_class: type[T]) -> T:
+        if component_class not in self.__components:
+            raise RuntimeError(f"tried to get {component_class} from {self}, but {component_class} was not found")
+        return self.__components[component_class]
 
 
 class AndNode(Node):
