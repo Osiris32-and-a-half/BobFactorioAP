@@ -1,7 +1,24 @@
 
+local sprite_count = 0
+for _, tech in pairs(data.raw.technology) do
+    if tech.research_trigger then
+        if tech.research_trigger.icons then
+            sprite_count = sprite_count + table_size(tech.research_trigger.icons)
+        end
+    end
+    if tech.icons then
+        sprite_count = sprite_count + table_size(tech.icons)
+    end
+end
+
+log("estimated sprites before AP: "..sprite_count)
+
+
+
 local general = require("Archipelago/general")
 require("Archipelago/locations")
 require("Archipelago/custom_recipes")
+local final_lib = require('libs/final-fixes')
 
 data.raw["item"]["rocket-part"].hidden = false
 data.raw["rocket-silo"]["rocket-silo"].fluid_boxes = {
@@ -171,12 +188,61 @@ end
 
 local technologies = data.raw["technology"]
 
+local stack_position = {}
+local technology_name_to_progressive_group_name = {}
+for progressive_name, progressive_group in pairs(general.technologies.progressive()) do
+    local counter = 1
+    for _, item in pairs(progressive_group) do
+        technology_name_to_progressive_group_name[item] = progressive_name
+        if stack_position[item] == nil then --ensure only the first instance of this item is found.
+            stack_position[item] = counter
+        end
+        counter = counter + 1
+    end
+end
+
 for _, name in pairs(general.technologies.hide_from_player()) do
     if technologies[name] == nil then
         error(name .." could not be found. This should be a technology that is present at this point in the loading stage. This is present in the list of technologies that need to be hidden from the player, but not in the game.")
     end
-    technologies[name].hidden = true
-    technologies[name].hidden_in_factoriopedia = false
-    technologies[name].unit = nil
-    technologies[name].research_trigger = {type = "scripted", localised_description = {"technology-description.ap-technology-script-trigger"}}
+    local tech = technologies[name]
+    tech.hidden_in_factoriopedia = false
+    tech.unit = nil
+    tech.prerequisites = tech.prerequisites or {}
+    table.insert(tech.prerequisites, "AP-lock")
+    tech.research_trigger = {
+        type = "scripted",
+        icons = {final_lib.get_icon_from_type("advancement")}
+    }
+
+    local stack_name = technology_name_to_progressive_group_name[name]
+    if stack_name ~= nil then
+        tech.research_trigger.trigger_description = {"archipelago.progressive-script-trigger", stack_position[name].."", stack_name}
+        --yes, adding that empty string is important.
+        tech.order = "zz-ap-"..stack_name.."-"..stack_position[name]
+    else
+        tech.research_trigger.trigger_description = {"archipelago.stand-alone-script-trigger", name}
+        tech.order = "zz-ap-"..name
+    end
 end
+
+for _, name in pairs(general.technologies.removed_technologies()) do
+    local tech = technologies[name]
+    tech.order = "za-ap-unlocked"
+    tech.research_trigger.trigger_description = {"archipelago.default-unlocked-script-trigger"}
+    tech.research_trigger.icons = {final_lib.get_icon_from_type("unlocked")}
+end
+
+local sprite_count = 0
+for _, tech in pairs(data.raw.technology) do
+    if tech.research_trigger then
+        if tech.research_trigger.icons then
+            sprite_count = sprite_count + table_size(tech.research_trigger.icons)
+        end
+    end
+    if tech.icons then
+        sprite_count = sprite_count + table_size(tech.icons)
+    end
+end
+
+log("estimated sprites in the tech screen: "..sprite_count)

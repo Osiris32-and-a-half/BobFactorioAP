@@ -74,7 +74,7 @@ function general.technologies.progressive()
     return {{ variable_to_lua(progressive_technology_table) }}
 end
 
-function general.technologies.removed_technologies ()
+function general.technologies.removed_technologies()
     return {{ variable_to_lua(removed_technologies) }}
 end
 

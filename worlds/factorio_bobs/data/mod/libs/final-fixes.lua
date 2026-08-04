@@ -65,7 +65,7 @@ local function get_white_progression_arrow()
 end
 
 --more icons need to be added to this if statement
-local function get_icon_from_type(type)
+function library.get_icon_from_type(type)
     if type == "advancement" or type == "unknown" then
         return get_gears_bright()
     elseif type == "useful" then
@@ -87,7 +87,7 @@ end
 
 local function get_background(icons, type, this_world)
     if this_world then return end --no background for your own items.
-    local pre_icons = get_icon_from_type(type)
+    local pre_icons = library.get_icon_from_type(type)
     pre_icons.tint = {r=0.7,g=0.7,b=0.7,a=0.7}
     table.insert(icons, pre_icons)
 end
@@ -166,10 +166,10 @@ function library.get_icons(location_information)
             get_background(icons, location_information.type, location_information.player_slot == general.slot_id)
             icons = get_factorio_icons(icons, location_information.item_name, location_information.player_slot == general.slot_id)
         else
-            icons = {get_icon_from_type(location_information.type)}
+            icons = {library.get_icon_from_type(location_information.type)}
         end
     else
-        icons = {get_icon_from_type(location_information.type)}
+        icons = {library.get_icon_from_type(location_information.type)}
     end
     set_top_layer(icons, location_information.type) --for the advancement arrow and other icons that work from the same category.
     return icons
@@ -180,6 +180,7 @@ library.template_tech =  { --making one from scratch, ensuring that absolutely n
     --name = "this-is-required" --this should be getting overwritten at every AP location. if it does not this is a good as any error to notify us.
     unit = {time = 10}, --10 second per research pack.
     --all other values either are default or are overwritten.
+    order = "aa-ap",
 }
 
 return library

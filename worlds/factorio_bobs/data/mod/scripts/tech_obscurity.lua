@@ -254,7 +254,7 @@ local function setup_storage(force)
     local done_triggers = {}
 
     for name, tech in pairs(game.forces[force.name].technologies) do
-        if tech.prototype.hidden == false and tech.prototype.name ~= "crash-prevention" then
+        if tech.prototype.hidden == false then
             if tech.prototype.research_trigger == nil then
                 if settings.global[general.mod_setting_names.layer_obscurity].value or settings.global[general.mod_setting_names.depth_obscurity].value>=1 then
                     hidden_science_tech[tech.name] = true

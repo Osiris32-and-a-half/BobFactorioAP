@@ -88,16 +88,17 @@ data:extend({{
         research_trigger = {
             type = "scripted",
         },
-        prerequisites = {"crash-prevention-lock"}
+        prerequisites = {"AP-lock"}
     },
     {
         type           = "technology",
-        name           = "crash-prevention-lock",
+        name           = "AP-lock",
         hidden         = true,
         icon           = "__base__/graphics/icons/small-scorchmark.png",
         icon_size      = 64,
         research_trigger = {
             type = "scripted",
         },
+        prerequisites = {},
     },
 })
