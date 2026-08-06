@@ -1,7 +1,7 @@
 from .Nodes import Node
 
 
-class RecipeEngineCore:
+class Graph:
     num_unnamed_nodes = 0
 
     def __init__(self):

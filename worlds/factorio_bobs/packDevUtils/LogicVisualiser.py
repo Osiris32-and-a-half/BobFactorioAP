@@ -5,7 +5,7 @@ cyto.load_extra_layouts()
 from dash import html, dcc, Output, Input
 
 from worlds.factorio_bobs import modpacks, FactorioModpack
-from worlds.factorio_bobs.RecipeEngine.RecipeEngineCore import RecipeEngineCore
+from worlds.factorio_bobs.RecipeEngine.Graph import Graph
 
 
 app = dash.Dash(__name__)
@@ -96,7 +96,7 @@ stylesheet = [
         }
     }
 ]
-loaded_graph: None | RecipeEngineCore = None
+loaded_graph: None | Graph = None
 
 def main():
     app.layout = html.Div([
@@ -150,7 +150,7 @@ def update_graph(modpack_name):
     modpack.init_locations()
     modpack.init_pack_check()
     global loaded_graph
-    loaded_graph: RecipeEngineCore = modpack.recipe_engine.recipe_engine
+    loaded_graph: Graph = modpack.recipe_engine.recipe_engine
 
     elements = []
     for node in loaded_graph.nodes.values():

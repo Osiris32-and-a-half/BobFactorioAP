@@ -6,7 +6,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, TypeVar
 
 from .RecipeEngine.Nodes import ItemNode, AndNode, RecipeNode
-from .RecipeEngine.RecipeEngineCore import RecipeEngineCore
+from .RecipeEngine.Graph import Graph
 
 try:
     import pulp
@@ -44,7 +44,7 @@ class GameItemManager:
     def __init__(self, modpack: "FactorioModpack"):
         self.modpack = modpack
         self.name = self.modpack.packName
-        self.recipe_engine = RecipeEngineCore()
+        self.recipe_engine = Graph()
 
         self.has_init = False
 
