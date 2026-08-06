@@ -5,6 +5,6 @@ import typing
 if typing.TYPE_CHECKING:
     from ..Nodes import Node
 
-class BaseComponent:
+class BaseNodeComponent:
     def __init__(self, owner: "Node"):
         self.owner: "Node" = owner

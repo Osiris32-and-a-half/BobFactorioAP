@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from typing import Callable
 
-from .BaseComponent import BaseComponent
+from .BaseComponent import BaseNodeComponent
 
 from ..Nodes import Node, AndNode, OrNode
 
 
-class MultiLogicComponent(BaseComponent):
+class MultiLogicComponent(BaseNodeComponent):
     def __init__(self, node: Node):
         super().__init__(node)
 

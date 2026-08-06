@@ -1,9 +1,7 @@
 from typing import TypeVar, Generic
 
-from .Components.BaseComponent import BaseComponent
-from .Logics.Abstract import AbstractNodeContainer
-
-T = TypeVar("T", bound=BaseComponent)
+from .NodeComponents.BaseNodeComponent import BaseNodeComponent
+T = TypeVar("T", bound=BaseNodeComponent)
 
 class Node(Generic[T]):
     LOGIC_CONTAINER_CLASSES = set()
@@ -20,11 +18,6 @@ class Node(Generic[T]):
 
         # this is the cost of using this node itself for any generic cost algorithm
         self.cost = 0
-
-        # A location for logic to store information per node
-        self.logic: dict[str, AbstractNodeContainer] = {}
-        for logic_container_class in Node.LOGIC_CONTAINER_CLASSES:
-            self.logic[logic_container_class.LOGIC_NAME] = logic_container_class()
 
         # Can spontaneously crate node however all usage is classed as manual
         # usage classification changes if all `required` aren't manual and another option for the node is available when catalyst
