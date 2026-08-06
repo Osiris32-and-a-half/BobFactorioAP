@@ -71,28 +71,45 @@ class BaseLogic:
         self.in_update: bool = False
 
     def disable(self):
-        self.manual_path = False
+        toUpdate = self.get_dependencies()
+
+        for node in toUpdate:
+            if node.manual_path is True or node.manual_path is self.owner:
+                node.manual_path = False
+            elif node.automate_path is True or node.automate_path is self.owner:
+                node.automate_path = False
+
+        for node in toUpdate:
+            node.test_enable()
+
+    def get_dependencies(self) -> set[BaseLogic]:
+        dependencies = self.__get_dependencies_not_including_self()
+        dependencies.add(self)
+        return dependencies
+
+    def __get_dependencies_not_including_self(self) -> set[BaseLogic]:
+        dependencies = set()
         for node in self.owner.used_by:
             external_logic: BaseLogic = node.get_component(MultiLogicComponent).worlds[self.slotID]
-            if not node.manual and (external_logic.manual_path is True or external_logic.manual_path is self.owner):
-                external_logic.__disable()
-            if external_logic.automate_path is True or external_logic.automate_path is self.owner:
-                external_logic.__automate_disable()
+            if external_logic.manual_path is True or external_logic.manual_path is self.owner:
+                dependencies.update(external_logic.get_dependencies())
+            elif external_logic.automate_path is True or external_logic.automate_path is self.owner:
+                dependencies.update(external_logic.get_automate_dependencies())
+        return dependencies
 
-    def __disable(self):
-        self.disable()
-        self.test_enable()
+    def get_automate_dependencies(self) -> set[BaseLogic]:
+        dependencies = self.__get_automate_dependencies_not_including_self()
+        dependencies.add(self)
+        return dependencies
 
-    def automate_disable(self):
-        self.automate_path = False
+    def __get_automate_dependencies_not_including_self(self):
+        dependencies = set()
         for node in self.owner.used_by:
             external_logic: BaseLogic = node.get_component(MultiLogicComponent).worlds[self.slotID]
             if external_logic.automate_path is True or external_logic.automate_path is self.owner:
-                external_logic.__automate_disable()
+                dependencies.update(external_logic.get_automate_dependencies())
 
-    def __automate_disable(self):
-        self.automate_disable()
-        self.test_enable()
+        return dependencies
 
 
 class AnyLogic(BaseLogic):
