@@ -1,13 +1,27 @@
+from typing import TypeVar, Generic
+
+from .GraphComponents import BaseGraphComponent
 from .Nodes import Node
 
+T = TypeVar("T", bound=BaseGraphComponent)
 
-class Graph:
-    num_unnamed_nodes = 0
-
+class Graph(Generic[T]):
     def __init__(self):
         self.nodes: dict[str, Node] = {}
+
+        self.__components: dict[type[T], T] = {}
 
     def add_node(self, node: Node):
         if node.name in self.nodes:
             raise RuntimeError(f"Node ({node.name}) already exists")
         self.nodes[node.name] = node
+
+    def register_component(self, component_class: type[T]):
+        if component_class in self.__components:
+            raise RuntimeError(f"{self} tried to register {component_class.__name__} twice")
+        self.__components[component_class] = component_class()
+
+    def get_component(self, component_class: type[T]) -> T:
+        if component_class not in self.__components:
+            raise RuntimeError(f"tried to get {component_class} from {self}, but {component_class} was not found")
+        return self.__components[component_class]
