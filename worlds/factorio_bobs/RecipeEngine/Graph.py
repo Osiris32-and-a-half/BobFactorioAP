@@ -4,6 +4,7 @@ from .GraphComponents import BaseGraphComponent
 from .Nodes import Node
 
 T = TypeVar("T", bound=BaseGraphComponent)
+N = TypeVar("N", bound=Node)
 
 class Graph(Generic[T]):
     def __init__(self):
@@ -11,10 +12,11 @@ class Graph(Generic[T]):
 
         self.__components: dict[type[T], T] = {}
 
-    def add_node(self, node: Node):
+    def add_node(self, node: N) -> N:
         if node.name in self.nodes:
             raise RuntimeError(f"Node ({node.name}) already exists")
         self.nodes[node.name] = node
+        return node
 
     def register_component(self, component_class: type[T]) -> T:
         if component_class in self.__components:
