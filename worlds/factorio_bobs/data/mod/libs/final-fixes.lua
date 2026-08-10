@@ -180,7 +180,6 @@ library.template_tech =  { --making one from scratch, ensuring that absolutely n
     --name = "this-is-required" --this should be getting overwritten at every AP location. if it does not this is a good as any error to notify us.
     unit = {time = 10}, --10 second per research pack.
     --all other values either are default or are overwritten.
-    order = "aa-ap",
 }
 
 return library

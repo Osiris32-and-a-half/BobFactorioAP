@@ -30,7 +30,6 @@ local function create_technology(location_data)
     new_location.icons = library.get_icons(location_data.information)
     new_location.prerequisites = location_data.prerequisites
     data:extend({new_location})
-    table.insert(data.raw.technology["AP-lock"].prerequisites, location_data.name)
 end
 
 {%- for location, item in locations %}
