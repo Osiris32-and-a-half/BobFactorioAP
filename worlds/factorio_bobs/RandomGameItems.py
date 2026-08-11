@@ -16,7 +16,7 @@ class RandomGameItems:
 
     @property
     def recipe_engine(self) -> GameItemManager:
-        return self.world.modpack.recipe_engine
+        return self.world.modpack.game_item_manager
 
     @property
     def num_of_items(self) -> int:

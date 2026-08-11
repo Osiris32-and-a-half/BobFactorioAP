@@ -29,14 +29,14 @@ class FactorioModpack(BaseModpack):
         self.__removed_technologies: set[str] | None = None
         self.__required_technologies: dict[str, FrozenSet[Technology]] | None = None
 
-        self.__recipe_engine: GameItemManager | None = None
+        self.__game_item_manager: GameItemManager | None = None
 
         self.__forced_locations: dict[str, int] | None = None
 
         self.location_pools: list[list[str]] | None = None
 
     def _init_pack(self):
-        self.recipe_engine.full_init()
+        self.game_item_manager.full_init()
 
     def init_items(self):
         self._add_item("Attack Trap")
@@ -68,10 +68,10 @@ class FactorioModpack(BaseModpack):
 
     def consistency_checks(self) -> None:
         is_consistent = True
-        if any(recipe_name not in self.recipe_engine.recipes.keys() for recipe_name in self.start_unlocked_recipes):
+        if any(recipe_name not in self.game_item_manager.recipes.keys() for recipe_name in self.start_unlocked_recipes):
             is_consistent = False
             self.logger.exception(f"Unknown Recipe defined. \n"
-                                  f"Missing: {tuple(recipe_name for recipe_name in self.start_unlocked_recipes if recipe_name not in self.recipe_engine.recipes.keys())}")
+                                  f"Missing: {tuple(recipe_name for recipe_name in self.start_unlocked_recipes if recipe_name not in self.game_item_manager.recipes.keys())}")
 
         if not is_consistent:
             raise Exception(f"Modpack {self.packName} consistency check failed.")
@@ -91,7 +91,7 @@ class FactorioModpack(BaseModpack):
 
         self.__required_technologies: dict[str, FrozenSet[Technology]] = (
             Utils.KeyedDefaultDict(lambda ingredient_name:
-                                   frozenset(self.recipe_engine.game_items[ingredient_name].all_unlocking_technologies())))
+                                   frozenset(self.game_item_manager.game_items[ingredient_name].all_unlocking_technologies())))
         self.__required_technologies["water"] = frozenset()
 
         self.__base_technology_table = self.__technology_table.copy()
@@ -217,10 +217,10 @@ class FactorioModpack(BaseModpack):
         return useless_overrides
 
     @property
-    def recipe_engine(self) -> GameItemManager:
-        if self.__recipe_engine is None:
-            self.__recipe_engine = GameItemManager(self)
-        return self.__recipe_engine
+    def game_item_manager(self) -> GameItemManager:
+        if self.__game_item_manager is None:
+            self.__game_item_manager = GameItemManager(self)
+        return self.__game_item_manager
 
     @cached_property
     def default_options(self):

@@ -150,7 +150,7 @@ def update_graph(modpack_name):
     modpack.init_locations()
     modpack.init_pack_check()
     global loaded_graph
-    loaded_graph: Graph = modpack.recipe_engine.recipe_engine
+    loaded_graph: Graph = modpack.game_item_manager.recipe_engine
 
     elements = []
     for node in loaded_graph.nodes.values():
