@@ -1,61 +1,31 @@
 from __future__ import annotations
 
 import json
-import math
 from enum import Enum
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING
 
-from .RecipeEngine.Nodes import ItemNode, AndNode, RecipeNode
 from .RecipeEngine.Graph import Graph
-
-try:
-    import pulp
-except ImportError:
-    pulp_enabled = False
-else:
-    pulp_enabled = True
+from .RecipeEngine.NodeComponents.BaseNodeComponent import BaseNodeComponent
+from .RecipeEngine.Nodes import ItemNode, RecipeNode, OrNode, Node
 
 if TYPE_CHECKING:
-    from . import Technology, FactorioModpack
+    from . import FactorioModpack
 
 GENERATOR_ENERGY = 1
-
-class DefinitionSource(Enum):
-    UNKNOWN = 0
-    EXTRACTED = 1
-    CUSTOM = 2
-    IMPLIED = 3
-    WORLD = 4
-
-class RecipeEngineType:
-    def __init__(self, ctx: GameItemManager, name: str, source: DefinitionSource):
-        self.name: str = name
-        self.ctx: GameItemManager = ctx
-        self.source: DefinitionSource = source
-        if source == DefinitionSource.IMPLIED:
-            ctx.modpack.logger.warning(f"{repr(self)}: is implied more strictly define")
-
-    def __repr__(self) -> str:
-        return f"{type(self).__name__}(name={self.name}, ctx={self.ctx.name})"
 
 class GameItemManager:
     invalidate_cache = False
 
-    def __init__(self, modpack: "FactorioModpack"):
+    def __init__(self, modpack: FactorioModpack):
         self.modpack = modpack
         self.name = self.modpack.packName
         self.recipe_engine = Graph()
 
         self.has_init = False
 
-        self.game_items: dict[str, GameItem] = {}
-        self.recipes: dict[str, GameRecipe] = {}
-
-        self.item_catalysts: dict[GameItem, OneItemCatalyst] = {}
-        self.categories: dict[str, Category] = {}
-        self.fluid_mining: set[GameRecipe] = set()
-
-        self.custom_invalid: set[GameItem] = set()
+        self.impossible_node = OrNode("Impossible")
+        self.technology_nodes: set[TechnologyNode] = set()
+        self.fluid_mining: set[RecipeNode] = set()
 
         self.__dif_entity_to_item: dict[str, str] | None = None
 
@@ -73,27 +43,6 @@ class GameItemManager:
         goal_items = {"rocket-part", "satellite", "rocket-silo"}
         randomizable_items = set(self.modpack.ordered_science_packs) | goal_items
 
-        for item_name in randomizable_items:
-            self.get_game_item(item_name).is_valid_pool = False
-        #
-        # if GameItemManager.invalidate_cache:
-        #     return
-        #
-        # try:
-        #     with self.modpack.open_file("Cache/precalc.json") as file:
-        #         raw_logic_pre_compute = json.load(file)
-        #     for name, data in raw_logic_pre_compute.items():
-        #         item = self.get_game_item(name)
-        #         item.has_calculated_raw = True
-        #         if "invalid" in data:
-        #             if item.name not in {"space-science-pack"}:
-        #                 item.set_invalid()
-        #             continue
-        #         item.best_recipes = {self.recipes[name] for name in data["recipes"]}
-        #         item.score = data["score"]
-        # except FileNotFoundError:
-        #     pass
-
 
     def __register_game_items(self) -> None:
         invalid_items = {"fluid-unknown"} | {f"parameter-{i}" for i in range(10)}
@@ -102,25 +51,30 @@ class GameItemManager:
             fluids: set[str] = set(json.load(file))
 
         for fluid in fluids:
-            ingredient = GameItem(self, fluid, DefinitionSource.EXTRACTED, True)
-            self.game_items[fluid] = ingredient
+            ingredient = ItemNode(f"item_{fluid}")
+            info: FactorioItemComponent = ingredient.register_component(FactorioItemComponent)
+            info.is_fluid = True
+            self.recipe_engine.add_node(ingredient)
             if fluid in invalid_items:
-                ingredient.is_valid_ingredient = False
+                ingredient.add_required(self.impossible_node, 1)
 
         with self.modpack.open_file("Extractor/items.json") as file:
             item_stack_sizes: dict[str, int] = json.load(file)
 
         for item, stack_size in item_stack_sizes.items():
-            ingredient = GameItem(self, item, DefinitionSource.EXTRACTED,False)
-            self.game_items[item] = ingredient
+            ingredient = ItemNode(f"item_{item}")
+            info: FactorioItemComponent = ingredient.register_component(FactorioItemComponent)
+            info.item_stack_size = stack_size
+            self.recipe_engine.add_node(ingredient)
             if ingredient.name in self.modpack.ordered_science_packs or ingredient.name in invalid_items:
-                ingredient.is_valid_ingredient = False
+                ingredient.add_required(self.impossible_node, 1)
 
     def __register_categories(self) -> None:
-        def get_category(name: str) -> Category:
-            if name not in self.categories:
-                self.categories[name] = Category(self, name, DefinitionSource.EXTRACTED)
-            return self.categories[name]
+        def get_or_create_category(name: str) -> CategoryNode:
+            if name not in self.recipe_engine.nodes:
+                return self.recipe_engine.add_node(CategoryNode(f"category_{name}"))
+            else:
+                return self.get_single_category_node(name)
 
         with self.modpack.open_file("Extractor/machines.json") as file:
             raw_machines = json.load(file)
@@ -128,34 +82,33 @@ class GameItemManager:
         for entity, categories in raw_machines.items():
             if entity == "character":
                 for category in categories:
-                    get_category(category).manual = True
-                get_category("basic-crafting").manual = True # somehow this is implied and not exported
-                get_category("basic-solid").manual = True # this is not a crafting category so not extracted todo look if some ores can't do this
+                    get_or_create_category(category).manual = True
+                get_or_create_category("basic-crafting").manual = True # somehow this is implied and not exported
+                get_or_create_category("basic-solid").manual = True # this is not a crafting category so not extracted todo look if some ores can't do this
                 continue
 
             item = self.get_item_from_entity(entity)
             if item.name == "assembling-machine-1":
-                get_category("crafting-with-fluid").machines.add(item) # mod enables this todo: disable?
+                get_or_create_category("crafting-with-fluid").add_required(item, 0) # mod enables this todo: disable?
             for category in categories:
-                get_category(category).machines.add(item)
+                get_or_create_category(category).add_required(item, 0)
 
     def __register_recipes(self):
-        self.__recipes: dict[str, GameRecipe] = {}
-
         with self.modpack.open_file("Extractor/resources.json") as file:  # todo find better method then opening twice
             raw_resources = json.load(file)
 
         for resource_name, resource_data in raw_resources.items():
+            recipe = self.recipe_engine.add_node(RecipeNode(resource_name))
+            recipe.cost = resource_data["mining_time"]
+
+            for product, amount in resource_data["products"]:
+                recipe.add_used_by(self.get_item_node(product), amount)
+
+            recipe.add_required(self.get_single_category_node(resource_data["category"]), 0)
             if "required_fluid" in resource_data:
-                GameRecipe(self, f"resource_{resource_name}", DefinitionSource.EXTRACTED, resource_data["category"],
-                           {resource_data["required_fluid"]: resource_data["fluid_amount"]},
-                           resource_data["products"], resource_data["mining_time"])
+                recipe.add_required(self.get_item_node(resource_data["required_fluid"]), resource_data["fluid_amount"])
                 if resource_data["category"] == "basic-solid":
-                    self.fluid_mining.add(self.recipes[f"resource_{resource_name}"])
-            else:
-                GameRecipe(self, f"resource_{resource_name}", DefinitionSource.EXTRACTED, resource_data["category"],
-                           {},
-                           resource_data["products"], resource_data["mining_time"])
+                    self.fluid_mining.add(recipe)
         del raw_resources
 
         with self.modpack.open_file("Extractor/recipes.json") as file:
@@ -163,25 +116,31 @@ class GameItemManager:
 
         for recipe_name, recipe_data in raw_recipes.items():
             # example "wheat-seeds":{"ingredients":{"wood":100},"products":{"wheat-seeds":1},"category":"organic-synth-recipes","energy":30}
-            if recipe_data["category"] not in self.categories: # No way to craft skip recipe
-                self.modpack.logger.debug(f"Recipe {recipe_name} has invalid category {recipe_data['category']}.")
-                continue
-            GameRecipe(self, recipe_name, DefinitionSource.EXTRACTED, recipe_data["category"],
-                       recipe_data["ingredients"], recipe_data["products"], recipe_data["energy"])
+            recipe = self.recipe_engine.add_node(RecipeNode(f"recipe_{recipe_name}"))
+
+            recipe.cost = recipe_data["energy"]
+
+            recipe.add_required(self.get_single_category_node(recipe_data["category"]), 0)
+            for ingredient, amount in recipe_data["ingredients"].items():
+                recipe.add_required(self.get_item_node(ingredient), amount)
+
+            for product, amount in recipe_data["products"].items():
+                recipe.add_used_by(self.get_item_node(product), amount)
         del raw_recipes
 
         with self.modpack.open_file("Extractor/generators.json") as file:
             raw_generators = json.load(file)
         for entity, product in raw_generators.items():
             item = self.get_item_from_entity(entity)
-            self.categories[f"generator_{item.name}"] = Category(self, f"generator_{item.name}",
-                                                                 DefinitionSource.EXTRACTED)
-            self.categories[f"generator_{item.name}"].machines.add(item)
-            GameRecipe(self, f"generator_{item.name}", DefinitionSource.EXTRACTED,
-                       f"generator_{item.name}",{}, {product: 1}, GENERATOR_ENERGY)
+            recipe = self.recipe_engine.add_node(RecipeNode(f"generator_{item.name}"))
+            recipe.cost = GENERATOR_ENERGY
+
+            recipe.add_required(item, 0)
+
+            recipe.add_used_by(self.get_item_node(product), 1)
         del raw_generators
 
-        if "offshore-pump" in self.categories:
+        if "category_offshore-pump" in self.recipe_engine.nodes:
             fluids = set()
             with self.modpack.open_file("Extractor/specialTiles.json") as file:
                 raw_tiles = json.load(file)
@@ -190,8 +149,11 @@ class GameItemManager:
                     fluids.add(special["fluid"])
             del raw_tiles
             for fluid in fluids:
-                GameRecipe(self, f"pump_{fluid}", DefinitionSource.EXTRACTED,
-                           "offshore-pump",{}, {fluid: 1}, GENERATOR_ENERGY)
+                recipe = self.recipe_engine.add_node(RecipeNode(f"pump_{fluid}"))
+                recipe.cost = GENERATOR_ENERGY
+
+                recipe.add_required(self.get_single_category_node("category_offshore-pump"),0)
+                recipe.add_used_by(self.get_item_node(fluid), 1)
 
         try:
             with self.modpack.open_file("customRecipes.json") as file:
@@ -203,23 +165,48 @@ class GameItemManager:
             # TODO add optional crafting_machine_tints
             # TODO add group for AP recipes
             # TODO add support for custom techs for recipes
-            GameRecipe(self, recipe_name, DefinitionSource.CUSTOM, recipe_data["category"],
-                       recipe_data["ingredients"], recipe_data["products"], recipe_data["energy"])
+            recipe = self.recipe_engine.add_node(RecipeNode(recipe_name))
+
+            recipe.cost = recipe_data["energy"]
+
+            recipe.add_required(self.get_single_category_node(recipe_data["category"]), 0)
+            for ingredient, amount in recipe_data["ingredients"].items():
+                recipe.add_required(self.get_item_node(ingredient), amount)
+
+            for product, amount in recipe_data["products"].items():
+                recipe.add_used_by(self.get_item_node(product), amount)
 
     def __link_technologies(self):
+        def add_technology(unlock: Node, tech: TechnologyNode):
+            for node in unlock.required:
+                if isinstance(node, MultiTechnologyNode):
+                    node.add_required(tech, 0)
+                    return
+                elif isinstance(node, TechnologyNode):
+                    unlock.remove_required({node}) # todo more efficient (post efficency pass on whole graph?)
+
+                    multiTech = self.recipe_engine.add_node(MultiTechnologyNode(f"unlock_{unlock.name}"))
+                    unlock.add_required(multiTech, 0)
+
+                    multiTech.add_required(node, 0)
+                    multiTech.add_required(tech, 0)
+                    return
+
+            unlock.add_required(tech, 0)
+
         for technology in self.modpack.base_technology_table.values():
-            if "mining-with-fluid" in technology.modifiers:
-                fluid_mining_tech = TechCatalyst(self, DefinitionSource.EXTRACTED, technology) # todo Multiple/none?
-                for recipe in self.fluid_mining:
-                    recipe.technologies.add(fluid_mining_tech)
-            if not technology.unlocks:
+            if not technology.unlocks and "mining-with-fluid" not in technology.modifiers:
                 continue
-            catalyst = TechCatalyst(self, DefinitionSource.EXTRACTED, technology)
+            technology_node = self.recipe_engine.add_node(TechnologyNode(f"technology_{technology.name}"))
+            self.technology_nodes.add(technology_node)
+            if "mining-with-fluid" in technology.modifiers:
+                for recipe in self.fluid_mining:
+                    recipe.add_required(technology_node, 0)
+
             for recipe_name in technology.unlocks:
-                if recipe_name in self.recipes:
-                    self.recipes[recipe_name].technologies.add(catalyst)
-                else:
-                    self.modpack.logger.debug(f"Technology {technology.name} unlocked unknown recipe: {recipe_name}")
+                self.recipe_engine.nodes[f"recipe_{recipe_name}"].add_required(technology_node, 0)
+
+
 
     def __load_settings(self) -> None:
         with self.modpack.open_file("recipeEngineSettings.json") as file:
@@ -229,167 +216,24 @@ class GameItemManager:
             for name, categories in raw_settings["missed_machines"].items():
                 item = self.get_item_from_entity(name)
                 for category in categories:
-                    self.get_category(category).machines.add(item)
+                    self.recipe_engine.nodes[f"category_{name}"].add_required(item, 0)
             del raw_settings["missed_machines"]
 
         if "invalid_ingredients" in raw_settings:
             for ingredient in raw_settings["invalid_ingredients"]:
-                self.custom_invalid.add(self.get_game_item(ingredient, DefinitionSource.CUSTOM))
+                self.get_item_node(ingredient).remove_required()
             del raw_settings["invalid_ingredients"]
 
         if "excluded_first_pool" in raw_settings:
             for ingredient in raw_settings["excluded_first_pool"]:
-                self.get_game_item(ingredient, DefinitionSource.CUSTOM).is_valid_first_pool = False
+                component: FactorioItemComponent = self.get_item_node(ingredient).get_component(FactorioItemComponent)
+                component.invalid_for_first_recipe_pool = True
             del raw_settings["excluded_first_pool"]
 
         for key in raw_settings.keys():
             self.modpack.logger.error(f"Unknown key in recipeEngineSettings.json: {key}")
 
-
-    def __remove_bad_items(self):
-        for name, item in self.game_items.copy().items():
-            if item.name in {"space-science-pack"}:
-                continue # todo remove this when silo recipes added
-            if item not in self.custom_invalid:
-                if item.crafted_by:
-                    continue
-                if item.used_in:
-                    if item.is_valid_pool:
-                        self.modpack.logger.warning(f"{item.name} is used but not method of obtaining it detected.\n"
-                                                    "Consider disabling it or adding a custom recipe")
-                self.modpack.logger.warning(f"{item.name} is defined but not used or craftable")
-            item.set_invalid()
-
-    def run_pulp_solver(self, goal: GameItem, remove_waste=False) \
-            -> tuple[int, float, set[GameRecipe], set[GameRecipe], dict[GameItem, float]]:
-        if not pulp_enabled:
-            raise Exception("Pulp is not installed. \n"
-                            "This means that the pack has not been precalculated. This is currently required.\n"
-                            "If you are trying to precalculate then you need to install Pulp.\n"
-                            "If the pack has been precalculated and you get this error report it in the discord thread alongside the pack.")
-
-        probBest = pulp.LpProblem("CraftingOptimization", pulp.LpMinimize)
-
-        recipe_qty = {
-            recipe: pulp.LpVariable(f"recipe_{recipe.name}", lowBound=0)
-            for recipe in self.recipes.values() if recipe.is_valid
-        }
-        waste = {
-            item: pulp.LpVariable(f"waste_{item.name}", lowBound=0)
-            for item in self.game_items.values()
-        }
-        # todo these are bad and massively slow things down a graph based solution to get bootstrap before hand would be better
-        can_get_item = {
-            item: pulp.LpVariable(f"cgi_{item.name}", cat="Binary")
-            for item in self.game_items.values() if item.is_valid
-        }
-        can_get_recipe = {
-            recipe: pulp.LpVariable(f"cgr_{recipe.name}", cat="Binary")
-            for recipe in self.recipes.values() if recipe.is_valid
-        }
-        can_get_category = {
-            category: pulp.LpVariable(f"cgc_{category.name}", cat="Binary")
-            for category in self.categories.values() if category.is_valid
-        }
-        # Add a 'ghost' supply for every item with a massive penalty
-        slack = {
-            item: pulp.LpVariable(f"slack_{item.name}", lowBound=0)
-            for item in self.game_items.values() if item.is_valid
-        }
-
-        # goal
-        epsilon = 1e-3
-        epsilon_2 = 1e-6
-        probBest += (pulp.lpSum(
-            recipe.energy * recipe_qty[recipe]
-            for recipe in recipe_qty.keys()
-        ) + epsilon * pulp.lpSum(can_get_recipe.values())
-                     + epsilon_2 * pulp.lpSum(waste.values()) + epsilon_2 * pulp.lpSum(recipe_qty.values())
-                     + pulp.lpSum(slack.values()) * 1e10)
-
-        # constraint first pass get best
-        for item in self.game_items.values():
-            if not item.is_valid:
-                continue
-            produced = [recipe_qty[recipe] * recipe.products[item] for recipe in item.crafted_by if recipe.is_valid]
-            consumed = [recipe_qty[recipe] * recipe.ingredients[item] for recipe in item.used_in if recipe.is_valid]
-
-            if item == goal:
-                probBest += pulp.lpSum(produced) - pulp.lpSum(consumed) + slack[item] == 1, f"balance_{item.name}"
-            else:
-                probBest += pulp.lpSum(produced) - pulp.lpSum(consumed) + slack[item] == 0 + waste[item], f"balance_{item.name}"
-
-            probBest += can_get_item[item] <= pulp.lpSum(can_get_recipe[recipe] for recipe in item.crafted_by if recipe.is_valid), f"can_get_{item.name}"
-
-        big_M = 1e5
-        for recipe in self.recipes.values():
-            if not recipe.is_valid:
-                continue
-            rec_qty = recipe_qty[recipe]
-            can_rec = can_get_recipe[recipe]
-
-            probBest += rec_qty <= can_rec * big_M
-            req = ({can_get_item[cat.item] for cat in recipe.needed_items if cat.is_valid}
-                   | {can_get_category[recipe.category]}
-                   | {can_get_item[ingredient] for ingredient in recipe.ingredients if ingredient.is_valid})
-            for catalyst in req:
-                probBest += can_rec <= catalyst
-
-        for category in self.categories.values():
-            if category.manual or not category.is_valid:
-                continue
-            probBest += can_get_category[category] <= pulp.lpSum(can_get_item[item] for item in category.machines if item.is_valid)
-
-        status = probBest.solve(pulp.PULP_CBC_CMD(msg=False))
-        score = probBest.objective.value()
-
-        req_recipes = set(recipe for recipe, value in can_get_recipe.items() if not math.isclose(value.value(), 0))
-
-        spawned_items = {item: var.value() for item, var in slack.items() if not math.isclose(var.value(), 0)}
-        if spawned_items:
-            status = -1
-        if not remove_waste:
-            return status, score, req_recipes, set(), depulp_dict(waste)
-
-        probWaste = pulp.LpProblem("WasteRemove", pulp.LpMinimize)
-
-        removal_force = 1e5
-        probWaste += pulp.lpSum(
-            recipe.energy * recipe_qty[recipe]
-            for recipe in recipe_qty.keys()
-        ) + removal_force * pulp.lpSum(waste.values()) + epsilon * pulp.lpSum(recipe_qty.values())
-
-        # constraint second pass remove waste
-        for item in self.game_items.values():
-            produced = [recipe_qty[recipe] * recipe.products[item] for recipe in item.crafted_by]
-            consumed = [recipe_qty[recipe] * recipe.ingredients[item] for recipe in item.used_in]
-
-            if item == goal:
-                probWaste += pulp.lpSum(produced) - pulp.lpSum(consumed) == 1, f"balance_{item.name}"
-            else:
-                probWaste += pulp.lpSum(produced) - pulp.lpSum(consumed) == 0 + waste[item], f"balance_{item.name}"
-
-        # constraint: keep best recipes
-        for recipe, pulp_var in recipe_qty.items():
-            quantity = pulp_var.value()
-            if -epsilon >= quantity or epsilon <= quantity:
-                probWaste += pulp_var >= quantity, f"force_{recipe.name}"
-
-        status = probBest.solve(pulp.PULP_CBC_CMD(msg=False))
-
-        if status != pulp.LpStatusOptimal:
-            self.modpack.logger.debug(f"{goal}: is wasteable with status {status}\n")
-
-        waste_recipes = set(recipe for recipe, value in recipe_qty.items() if (not math.isclose(value.value(), 0)) and recipe not in req_recipes)
-
-        return status, score, req_recipes, waste_recipes, depulp_dict(waste)
-
-    def get_item_catalyst(self, item: GameItem) -> OneItemCatalyst:
-        if item not in self.item_catalysts:
-            self.item_catalysts[item] = OneItemCatalyst(DefinitionSource.UNKNOWN, item)
-        return self.item_catalysts[item]
-
-    def get_item_from_entity(self, entity: str) -> GameItem:
+    def get_item_from_entity(self, entity: str) -> ItemNode:
         if self.__dif_entity_to_item is None:
             with self.modpack.open_file("Extractor/entityToItem.json") as file:
                 self.__dif_entity_to_item = json.load(file)
@@ -397,282 +241,33 @@ class GameItemManager:
         if entity in self.__dif_entity_to_item:
             entity = self.__dif_entity_to_item[entity]
 
-        return self.game_items[entity]
+        return self.get_item_node(entity)
 
-    def get_game_item(self, item: GameItem | str, source: DefinitionSource = DefinitionSource.IMPLIED) -> GameItem:
-        if type(item) is GameItem:
-            if item.ctx is self:
-                return item
-            else:
-                item = item.name # should never happen but just in case
-        if item in self.game_items:
-            return self.game_items[item]
-        if source != DefinitionSource.EXTRACTED:
-            raise RuntimeError(f"{item} is not a valid ingredient")
-        self.game_items[item] = GameItem(self, item, DefinitionSource.IMPLIED)
-        return self.game_items[item]
+    def get_item_node(self, item: str) -> ItemNode:
+        item: Node = self.recipe_engine.nodes[f"item_{item}"]
+        assert isinstance(item, ItemNode)
+        item: ItemNode
+        return item
 
-    def get_category(self, category: Category | str, source: DefinitionSource = DefinitionSource.IMPLIED) -> Category:
-        if type(category) is Category:
-            if category.ctx is self:
-                return category
-            else:
-                category = category.name # should never happen but just in case
-        if category in self.categories:
-            return self.categories[category]
-        if source != DefinitionSource.EXTRACTED:
-            raise RuntimeError(f"{category} is not a valid category")
-        self.categories[category] = Category(self, category, DefinitionSource.IMPLIED)
-        return self.categories[category]
+    def get_single_category_node(self, category: str) -> CategoryNode:
+        category: Node = self.recipe_engine.nodes[f"category_{category}"]
+        assert isinstance(category, CategoryNode)
+        category: CategoryNode
+        return category
 
-    def get_pool_items(self) -> set[GameItem]:
-        for item in self.game_items.values():
-            item.raw_calculate()
-        valid_ingredients = {x for x in self.game_items.values() if x.is_valid_pool}
-        return valid_ingredients
+class CategoryNode(OrNode):
+    pass
 
+class TechnologyNode(OrNode):
+    pass
 
-class GameItem(RecipeEngineType):
-    def __init__(self, ctx: GameItemManager, name: str, source: DefinitionSource,
-                 is_fluid: bool = False):
-        super().__init__(ctx, name, source)
-        self.is_fluid = is_fluid
+class MultiTechnologyNode(OrNode):
+    pass
 
-        self.node = ItemNode(f"Item: {name}")
-        ctx.recipe_engine.add_node(self.node)
+class FactorioItemComponent(BaseNodeComponent):
+    def __init__(self, owner: Node):
+        super().__init__(owner)
+        self.is_fluid = False
+        self.item_stack_size: None | int = None
 
-        self.has_calculated_raw: bool = False
-        self.best_recipes: set[GameRecipe] = set()
-        self.score: float = float("inf")
-        # self.req_techs: set[TechCatalyst] | None = None
-
-        self.is_valid: bool = True
-        self.__is_valid_first_pool: bool = True
-        self.__is_valid_pool: bool = source != DefinitionSource.IMPLIED
-
-        self.used_in: set[GameRecipe] = set()
-        self.crafted_by: set[GameRecipe] = set()
-
-    @property
-    def is_valid_first_pool(self) -> bool:
-        return self.is_valid_pool and self.__is_valid_first_pool
-
-    @is_valid_first_pool.setter
-    def is_valid_first_pool(self, is_valid_first_pool: bool) -> None:
-        self.__is_valid_first_pool = is_valid_first_pool
-
-    @property
-    def is_valid_pool(self) -> bool:
-        return self.__is_valid_pool and self.is_valid
-
-    @is_valid_pool.setter
-    def is_valid_pool(self, is_valid_pool: bool) -> None:
-        self.__is_valid_pool = is_valid_pool
-
-    def raw_calculate(self) -> None:
-        if self.has_calculated_raw or not self.is_valid:
-            return
-        self.has_calculated_raw = True
-
-        status, score, best_recipes, waste_recipes, waste = self.ctx.run_pulp_solver(self)
-        if status != pulp.LpStatusOptimal:
-            if self.name not in {"space-science-pack"}:
-                self.ctx.modpack.logger.warn(f"{self}: is uncraftable with status {pulp.LpStatus[status]}")
-                self.set_invalid()
-            return
-        self.score = score
-        self.best_recipes = best_recipes
-        # self.req_techs = {tech for recipe in self.best_recipes for tech in recipe.catalysts if isinstance(tech, TechCatalyst)}
-
-    def get_best_recipes(self):
-        if not self.best_recipes:
-            self.__eval_best()
-        return self.best_recipes
-
-    def __eval_best(self):
-        status, score, best_recipes, waste_recipes, waste = self.ctx.run_pulp_solver(self)
-        if status != pulp.LpStatusOptimal:
-            self.ctx.modpack.logger.warn(f"{self}: is uncraftable with status {status}\n"
-                                     f"removing {self}")
-            self.set_invalid()
-        self.score = score
-        self.best_recipes = best_recipes
-
-    def set_invalid(self):
-        self.is_valid = False
-        for recipe in self.used_in.copy():
-            recipe.set_invalid()
-        # if self.name in self.ctx.game_items:
-        #     del self.ctx.game_items[self.name]
-
-    def get_req_techs(self) -> set[Technology]:
-        techs = set()
-        for recipe in self.best_recipes:
-            if recipe.name in self.ctx.modpack.start_unlocked_recipes:
-                continue
-            for tech_cat in recipe.technologies:
-                techs.add(tech_cat.tech)
-        return techs
-
-
-class GameRecipe(RecipeEngineType):
-    def __init__(self, ctx: GameItemManager, name: str, source: DefinitionSource, category: Category | str,
-                 ingredients: dict[GameItem | str, float], products: dict[GameItem | str, float], energy: float):
-        super().__init__(ctx, name, source)
-        self.node = RecipeNode(f"Recipe: {name}")
-        ctx.recipe_engine.add_node(self.node)
-        self.ingredients: dict[GameItem, float] = {ctx.get_game_item(ingredient, source): amount
-                                                   for ingredient, amount in ingredients.items()}
-        self.products: dict[GameItem, float] = {ctx.get_game_item(product, source): amount
-                                                for product, amount in products.items()}
-
-        self.energy = energy
-
-        if not self.ingredients:
-            self.cost: float = self.energy
-        else:
-            self.cost: float = float("inf")
-
-        true_ingredient = self.ingredients.copy()
-        true_products = self.products.copy()
-        for ingredient, amount in true_ingredient.copy().items():
-            if ingredient not in true_products:
-                continue
-            new_amount = true_products[ingredient] - amount
-            if new_amount >= 0:
-                true_ingredient[ingredient] = 0
-                true_products[ingredient] = new_amount
-            else:
-                del true_products[ingredient]
-                true_ingredient[ingredient] = -new_amount
-
-        for ingredient, amount in true_ingredient.items():
-            self.node.add_required(ingredient.node, amount)
-
-        for product, amount in true_products.items():
-            self.node.add_used_by(product.node, amount)
-
-        self.category: Category = ctx.get_category(category)
-
-        self.node.add_required(self.category.node, 0)
-
-        self.has_calculated_raw: bool = False
-        self.is_valid: bool = True
-
-        self.is_starter: bool = name in ctx.modpack.start_unlocked_recipes
-
-        self.technologies: set[TechCatalyst] = set()
-        self.needed_items: set[ItemCatalyst] = set()
-
-        self.productivity: bool | None = None # ternary set to override default
-
-        if self.source == DefinitionSource.WORLD:
-            for ingredient in self.ingredients:
-                if ingredient.source == DefinitionSource.WORLD:
-                    ingredient.used_in.add(self)
-            for product in self.products:
-                if product.source == DefinitionSource.WORLD:
-                    product.crafted_by.add(self)
-        elif self.is_valid: # link
-            ctx.recipes[self.name] = self
-            for ingredient in self.ingredients:
-                ingredient.used_in.add(self)
-            for product in self.products:
-                product.crafted_by.add(self)
-
-    def set_invalid(self):
-        self.is_valid = False
-        for product in self.products:
-            if self in product.crafted_by:
-                product.crafted_by.remove(self)
-                if not product.crafted_by:
-                    product.set_invalid()
-        for ingredient in self.ingredients:
-            if self in ingredient.used_in:
-                ingredient.used_in.remove(self)
-        # if self.name in self.ctx.recipes:
-        #     del self.ctx.recipes[self.name]
-
-    def get_req_techs(self) -> set[Technology]:
-        techs = set()
-        for item in self.ingredients.keys():
-            techs.update(item.get_req_techs())
-        for cat in self.needed_items:
-            techs.update(cat.item.get_req_techs())
-        if self.name not in self.ctx.modpack.start_unlocked_recipes:
-            for tech in self.technologies:
-                techs.add(tech.tech)
-        return techs
-
-
-
-
-class Catalyst(RecipeEngineType):
-    def __init__(self, ctx: GameItemManager, name: str, source: DefinitionSource):
-        super().__init__(ctx, name, source)
-        self.has_calculated_raw: bool = False
-        self.is_valid: bool = True
-        self.req_techs: set[TechCatalyst] | None = None
-
-    def raw_calculate(self):
-        pass
-
-
-class ItemCatalyst(Catalyst):
-    def __init__(self, ctx: GameItemManager, name: str, source: DefinitionSource):
-        super().__init__(ctx, name, source)
-        self.item: GameItem | None = None
-
-
-class Category(ItemCatalyst):
-    def __init__(self, ctx: GameItemManager, name: str, source: DefinitionSource):
-        super().__init__(ctx, name, source)
-        self.node = AndNode(f"Category :{name}")
-        ctx.recipe_engine.add_node(self.node)
-
-        self.machines: set[GameItem] = set()
-        self.manual = False
-
-    @property
-    def manual(self):
-        return self._manual
-
-    @manual.setter
-    def manual(self, value):
-        self._manual = value
-        self.node.manual = value
-
-    @property
-    def machines(self):
-        return self._machines
-
-    @machines.setter
-    def machines(self, value: set[GameItem]):
-        self._machines = value
-        self.node.remove_required()
-        for machine in value:
-            self.node.add_required(machine.node, 1)
-
-
-class OneItemCatalyst(ItemCatalyst):
-    def __init__(self, source: DefinitionSource,
-                 item: GameItem):
-        super().__init__(item.ctx, item.name, source)
-        self.item = item
-
-class TechCatalyst(Catalyst):
-    def __init__(self, ctx: GameItemManager, source: DefinitionSource, tech: Technology):
-        super().__init__(ctx, tech.name, source)
-        self.tech = tech
-        self.req_techs = {self}
-
-
-T = TypeVar("T")
-def depulp_dict(dictionary: dict[T, pulp.LpVariable]) -> dict[T, float]:
-    out: dict[T, float] = {}
-    for key, value in dictionary.items():
-        qty = value.value()
-        epsilon = 1e-6
-        if -epsilon >= value or epsilon <= value:
-            out[key] = qty
-    return out
+        self.invalid_for_first_recipe_pool = False
