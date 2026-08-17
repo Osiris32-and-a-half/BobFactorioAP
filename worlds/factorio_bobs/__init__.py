@@ -311,25 +311,12 @@ class FactorioBobs(World):
 
         for node in self.modpack.game_item_manager.recipe_engine.nodes.values():
             component: MultiLogicComponent
-            if not MultiLogicComponent in node.components:
+            if not node.has_component(MultiLogicComponent):
                 component = node.register_component(MultiLogicComponent)
             else:
                 component = node.get_component(MultiLogicComponent)
 
             component.worlds[player] = AnyLogic(node, player)
-
-        if self.options.additional_logic.value == self.options.additional_logic.option_none:
-            self.additional_logic = {}
-        elif self.options.additional_logic.value == self.options.additional_logic.option_default:
-            self.additional_logic = {complexity:
-                                        process_yaml_rule(yaml_rule, self.modpack)
-                                     for complexity, yaml_rule in self.modpack.default_options["additional_logic"].items()}
-        elif self.options.additional_logic.value == self.options.additional_logic.option_custom:
-            self.additional_logic = {complexity:
-                                        process_yaml_rule(yaml_rule, self.modpack)
-                                     for complexity, yaml_rule in self.options.custom_additional_logic.value.items()}
-        else:
-            raise OptionError("additional_logic is invalid type")
 
         shapes = get_shapes(self)
 
@@ -340,7 +327,12 @@ class FactorioBobs(World):
             location = self.get_location(f"Automate {science_pack}")
 
             science_pack_node = self.modpack.game_item_manager.get_item_node(science_pack)
-            rule = NodeRule(science_pack_node) & self.additional_logic[complexity]
+
+            rule = NodeRule(science_pack_node)
+
+            if complexity in self.options.custom_additional_logic.value.keys():
+                additional_logic_rule = process_yaml_rule(self.options.custom_additional_logic[str(complexity)], self.modpack)
+                rule &= additional_logic_rule
             self.set_rule(location, rule)
 
         for location in self.science_locations:
