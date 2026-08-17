@@ -98,7 +98,6 @@ class FactorioBobs(World):
 
     def __init__(self, world, player: int):
         super(FactorioBobs, self).__init__(world, player)
-        self.additional_logic: dict[int, Rule] = {}
         self.progression_technologies: set[Technology] = set()
         # self.custom_recipes : typing.Dict[str, GameRecipe] = {}
         # self.custom_products: dict[str, GameItem] = {}
@@ -342,7 +341,7 @@ class FactorioBobs(World):
                 for prerequisite in prerequisites:
                     rule &= CanReachLocation(prerequisite.name)
 
-            Rules.set_rule(location, rule)
+            self.set_rule(location, rule)
             # Rules.set_rule(location, lambda state, ingredients=frozenset(location.ingredients):
             #     all(state.has(f"Automated {ingredient}", player) for ingredient in ingredients))
 
