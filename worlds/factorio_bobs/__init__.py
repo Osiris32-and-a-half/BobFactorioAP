@@ -191,19 +191,6 @@ class FactorioBobs(World):
             self.options.tech_cost_mix.value = slot_options[self.options.tech_cost_mix.display_name]
             self.options.number_of_science_packs.value = slot_options[self.options.number_of_science_packs.display_name]
 
-        if self.options.additional_logic.value == self.options.additional_logic.option_none:
-            self.additional_logic = {}
-        elif self.options.additional_logic.value == self.options.additional_logic.option_default:
-            self.additional_logic = {complexity:
-                                        process_yaml_rule(yaml_rule, self.modpack)
-                                     for complexity, yaml_rule in self.modpack.default_options["additional_logic"].items()}
-        elif self.options.additional_logic.value == self.options.additional_logic.option_custom:
-            self.additional_logic = {complexity:
-                                        process_yaml_rule(yaml_rule, self.modpack)
-                                     for complexity, yaml_rule in self.options.custom_additional_logic.value.items()}
-        else:
-            raise OptionError("additional_logic is invalid type")
-
         # handle marking progressive techs as advancement
         prog_add = set()
         for tech in self.progression_technologies:
@@ -330,6 +317,19 @@ class FactorioBobs(World):
                 component = node.get_component(MultiLogicComponent)
 
             component.worlds[player] = AnyLogic(node, player)
+
+        if self.options.additional_logic.value == self.options.additional_logic.option_none:
+            self.additional_logic = {}
+        elif self.options.additional_logic.value == self.options.additional_logic.option_default:
+            self.additional_logic = {complexity:
+                                        process_yaml_rule(yaml_rule, self.modpack)
+                                     for complexity, yaml_rule in self.modpack.default_options["additional_logic"].items()}
+        elif self.options.additional_logic.value == self.options.additional_logic.option_custom:
+            self.additional_logic = {complexity:
+                                        process_yaml_rule(yaml_rule, self.modpack)
+                                     for complexity, yaml_rule in self.options.custom_additional_logic.value.items()}
+        else:
+            raise OptionError("additional_logic is invalid type")
 
         shapes = get_shapes(self)
 
