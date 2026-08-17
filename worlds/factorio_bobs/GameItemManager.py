@@ -245,7 +245,9 @@ class GameItemManager:
             # todo remove this
             # I would prefer all items to be found at item creation step
             # I do not know currently where rocket parts come or go though
-            node = ItemNode(f"item_{item}")
+            node = self.recipe_engine.add_node(ItemNode(f"item_{item}"))
+            assert type(node) is ItemNode
+            node: ItemNode
             node.register_component(FactorioItemComponent)
             return node
         node: Node = self.recipe_engine.nodes[f"item_{item}"]
