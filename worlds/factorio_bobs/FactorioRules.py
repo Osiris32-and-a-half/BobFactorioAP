@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from BaseClasses import CollectionState
 
 @dataclasses.dataclass()
-class NodeRule(Rule[FactorioBobs], game="Factorio Modpacks"):
+class NodeRule(Rule["FactorioBobs"], game="Factorio Modpacks"):
     def __init__(self, item: Node):
         super().__init__()
         self.node = item
