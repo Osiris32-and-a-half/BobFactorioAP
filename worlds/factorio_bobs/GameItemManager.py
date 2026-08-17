@@ -241,10 +241,16 @@ class GameItemManager:
         return self.get_item_node(entity)
 
     def get_item_node(self, item: str) -> ItemNode:
-        item: Node = self.recipe_engine.nodes[f"item_{item}"]
-        assert isinstance(item, ItemNode)
-        item: ItemNode
-        return item
+        node: Node = self.recipe_engine.nodes[f"item_{item}"]
+        assert isinstance(node, ItemNode)
+        node: ItemNode
+        return node
+
+    def get_recipe_node(self, recipe: str) -> RecipeNode:
+        node: Node = self.recipe_engine.nodes[f"recipe_{recipe}"]
+        assert isinstance(node, RecipeNode)
+        node: ItemNode
+        return node
 
     def get_single_category_node(self, category: str) -> CategoryNode:
         category: Node = self.recipe_engine.nodes[f"category_{category}"]
