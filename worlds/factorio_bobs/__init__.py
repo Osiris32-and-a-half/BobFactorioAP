@@ -19,6 +19,7 @@ from .FactorioOptions import (FactorioOptions, Silo, Satellite, TechTreeInformat
                               TechCostDistribution, option_groups)
 from .FactorioRules import InternalItemRule, TechRule, AndRule, OrRule, process_yaml_rule, Rule
 from .RandomGameItems import RandomGameItems
+from .RecipeEngine.NodeComponents.LogicComponents import MultiLogicComponent
 from .RecipeEngine.Nodes import RecipeNode, ItemNode
 from .Shapes import get_shapes
 from .FactorioSettings import FactorioSettings
@@ -399,6 +400,22 @@ class FactorioBobs(World):
 
         return super(FactorioBobs, self).collect_item(state, item, remove)
 
+    def collect(self, state: CollectionState, item: Item) -> bool:
+        change = super().collect(state, item)
+        if change and item.name in self.modpack.game_item_manager.technology_nodes:
+            node = self.modpack.game_item_manager.technology_nodes[item.name]
+            component: MultiLogicComponent = node.get_component(MultiLogicComponent)
+            component.worlds[self.player].force_enable()
+        return change
+
+    def remove(self, state: CollectionState, item: Item) -> bool:
+        change = super().remove(state, item)
+        if change and item in self.modpack.game_item_manager.technology_nodes:
+            node = self.modpack.game_item_manager.technology_nodes[item.name]
+            component: MultiLogicComponent = node.get_component(MultiLogicComponent)
+            component.worlds[self.player].disable()
+        return change
+
     @classmethod
     def stage_write_spoiler(cls, world, spoiler_handle):
         factorio_players = world.get_game_players(cls.game)
@@ -599,13 +616,14 @@ class FactorioBobs(World):
         #     new_recipe.ingredients[ingredient_name] = self.random.randint(50, 500)
         # self.custom_recipes[bridge.name] = new_recipe
 
-        needed_items = {self.get_internal_item(pack) for pack in self.get_allowed_packs()}
-        needed_items.add(self.custom_products["rocket-part"])
-        if self.options.silo != Silo.option_spawn:
-            needed_items.add(self.get_internal_item("rocket-silo"))
-            needed_items.add(self.get_internal_item("cargo-landing-pad"))
-        if self.options.goal.value == Goal.option_satellite:
-            needed_items.add(self.get_internal_item("satellite"))
+        # needed_items = {self.get_internal_item(pack) for pack in self.get_allowed_packs()}
+        # needed_items.add(self.custom_products["rocket-part"])
+        # if self.options.silo != Silo.option_spawn:
+        #     needed_items.add(self.get_internal_item("rocket-silo"))
+        #     needed_items.add(self.get_internal_item("cargo-landing-pad"))
+        # if self.options.goal.value == Goal.option_satellite:
+        #     needed_items.add(self.get_internal_item("satellite"))
+        needed_items = [tech for tech in self.modpack.base_technology_table.values() if tech.name in self.modpack.game_item_manager.technology_nodes] # todo reduce number
 
         for item in needed_items:
             self.progression_technologies |= self.get_item_tech_req(item.name)

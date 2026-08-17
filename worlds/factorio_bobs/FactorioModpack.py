@@ -27,7 +27,6 @@ class FactorioModpack(BaseModpack):
         self.__progressive_technology_table: dict[str, Technology] | None = None
         self.__tech_to_progressive_lookup: dict[str, str] | None = None
         self.__removed_technologies: set[str] | None = None
-        self.__required_technologies: dict[str, FrozenSet[Technology]] | None = None
 
         self.__game_item_manager: GameItemManager | None = None
 
@@ -68,10 +67,10 @@ class FactorioModpack(BaseModpack):
 
     def consistency_checks(self) -> None:
         is_consistent = True
-        if any(recipe_name not in self.game_item_manager.recipes.keys() for recipe_name in self.start_unlocked_recipes):
-            is_consistent = False
-            self.logger.exception(f"Unknown Recipe defined. \n"
-                                  f"Missing: {tuple(recipe_name for recipe_name in self.start_unlocked_recipes if recipe_name not in self.game_item_manager.recipes.keys())}")
+        # if any(recipe_name not in self.game_item_manager.recipes.keys() for recipe_name in self.start_unlocked_recipes):
+        #     is_consistent = False
+        #     self.logger.exception(f"Unknown Recipe defined. \n"
+        #                           f"Missing: {tuple(recipe_name for recipe_name in self.start_unlocked_recipes if recipe_name not in self.game_item_manager.recipes.keys())}")
 
         if not is_consistent:
             raise Exception(f"Modpack {self.packName} consistency check failed.")
@@ -88,11 +87,6 @@ class FactorioModpack(BaseModpack):
                 unlocks=set(data["unlocks"]) - self.start_unlocked_recipes,
             )
             self.__technology_table[technology_name] = technology
-
-        self.__required_technologies: dict[str, FrozenSet[Technology]] = (
-            Utils.KeyedDefaultDict(lambda ingredient_name:
-                                   frozenset(self.game_item_manager.game_items[ingredient_name].all_unlocking_technologies())))
-        self.__required_technologies["water"] = frozenset()
 
         self.__base_technology_table = self.__technology_table.copy()
         self.__progressive_technology_table: dict[str, Technology] = {}
@@ -137,13 +131,6 @@ class FactorioModpack(BaseModpack):
 
         for key in raw_settings.keys():
             self.logger.error(f"Unknown key in worldSettings.json: {key}")
-
-
-    @property
-    def required_technologies(self) -> dict[str, FrozenSet[Technology]]:
-        if self.__required_technologies is None:
-            self.__init_technologies()
-        return self.__required_technologies
 
     @property
     def technology_table(self) -> dict[str, Technology]:

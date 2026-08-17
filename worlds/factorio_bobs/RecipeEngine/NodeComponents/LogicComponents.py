@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Callable
 
-from .BaseComponent import BaseNodeComponent
+from .BaseNodeComponent import BaseNodeComponent
 
 from ..Nodes import Node, AndNode, OrNode
 
@@ -111,6 +111,10 @@ class BaseLogic:
 
         return dependencies
 
+    def force_enable(self):
+        self.automate_path = True
+        for node in self.owner.used_by.keys():
+            node.get_component(MultiLogicComponent).worlds[self.slotID].test_enable()
 
 class AnyLogic(BaseLogic):
     def __test_enable(self) -> bool:

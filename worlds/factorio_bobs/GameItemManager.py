@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from enum import Enum
 from typing import TYPE_CHECKING
 
 from .RecipeEngine.Graph import Graph
@@ -24,7 +23,7 @@ class GameItemManager:
         self.has_init = False
 
         self.impossible_node = OrNode("Impossible")
-        self.technology_nodes: set[TechnologyNode] = set()
+        self.technology_nodes: dict[str, TechnologyNode] = {}
         self.fluid_mining: set[RecipeNode] = set()
 
         self.__dif_entity_to_item: dict[str, str] | None = None
@@ -198,15 +197,13 @@ class GameItemManager:
             if not technology.unlocks and "mining-with-fluid" not in technology.modifiers:
                 continue
             technology_node = self.recipe_engine.add_node(TechnologyNode(f"technology_{technology.name}"))
-            self.technology_nodes.add(technology_node)
+            self.technology_nodes[technology.name] = technology_node
             if "mining-with-fluid" in technology.modifiers:
                 for recipe in self.fluid_mining:
                     recipe.add_required(technology_node, 0)
 
             for recipe_name in technology.unlocks:
-                self.recipe_engine.nodes[f"recipe_{recipe_name}"].add_required(technology_node, 0)
-
-
+                add_technology(self.recipe_engine.nodes[f"recipe_{recipe_name}"], technology_node)
 
     def __load_settings(self) -> None:
         with self.modpack.open_file("recipeEngineSettings.json") as file:
