@@ -82,6 +82,11 @@ class Node(Generic[T]):
         self.__components[component_class] = component_class(self)
         return self.__components[component_class]
 
+    def has_component(self, component_class: type[T]) -> bool:
+        if component_class in self.__components:
+            return True
+        return False
+
     def get_component(self, component_class: type[T]) -> T:
         if component_class not in self.__components:
             raise RuntimeError(f"tried to get {component_class} from {self}, but {component_class} was not found")
