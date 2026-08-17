@@ -70,7 +70,7 @@ class GameItemManager:
 
     def __register_categories(self) -> None:
         def get_or_create_category(name: str) -> CategoryNode:
-            if name not in self.recipe_engine.nodes:
+            if f"category_{name}" not in self.recipe_engine.nodes:
                 return self.recipe_engine.add_node(CategoryNode(f"category_{name}"))
             else:
                 return self.get_single_category_node(name)
@@ -100,7 +100,7 @@ class GameItemManager:
             recipe = self.recipe_engine.add_node(RecipeNode(resource_name))
             recipe.cost = resource_data["mining_time"]
 
-            for product, amount in resource_data["products"]:
+            for product, amount in resource_data["products"].items():
                 recipe.add_used_by(self.get_item_node(product), amount)
 
             recipe.add_required(self.get_single_category_node(resource_data["category"]), 0)
@@ -121,10 +121,10 @@ class GameItemManager:
 
             recipe.add_required(self.get_single_category_node(recipe_data["category"]), 0)
             for ingredient, amount in recipe_data["ingredients"].items():
-                recipe.add_required(self.get_item_node(ingredient), amount)
+                recipe.add_required(self.get_item_node(ingredient, strict=False), amount)
 
             for product, amount in recipe_data["products"].items():
-                recipe.add_used_by(self.get_item_node(product), amount)
+                recipe.add_used_by(self.get_item_node(product, strict=False), amount)
         del raw_recipes
 
         with self.modpack.open_file("Extractor/generators.json") as file:
@@ -151,7 +151,7 @@ class GameItemManager:
                 recipe = self.recipe_engine.add_node(RecipeNode(f"pump_{fluid}"))
                 recipe.cost = GENERATOR_ENERGY
 
-                recipe.add_required(self.get_single_category_node("category_offshore-pump"),0)
+                recipe.add_required(self.get_single_category_node("offshore-pump"),0)
                 recipe.add_used_by(self.get_item_node(fluid), 1)
 
         try:
@@ -240,7 +240,14 @@ class GameItemManager:
 
         return self.get_item_node(entity)
 
-    def get_item_node(self, item: str) -> ItemNode:
+    def get_item_node(self, item: str, strict=True) -> ItemNode:
+        if not strict and f"item_{item}" not in self.recipe_engine.nodes:
+            # todo remove this
+            # I would prefer all items to be found at item creation step
+            # I do not know currently where rocket parts come or go though
+            node = ItemNode(f"item_{item}")
+            node.register_component(FactorioItemComponent)
+            return node
         node: Node = self.recipe_engine.nodes[f"item_{item}"]
         assert isinstance(node, ItemNode)
         node: ItemNode
