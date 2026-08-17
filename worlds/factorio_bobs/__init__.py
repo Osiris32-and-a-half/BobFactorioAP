@@ -5,6 +5,7 @@ import logging
 import random
 import typing
 
+from rule_builder.rules import Has, And, CanReachLocation
 from .FactorioModpack import FactorioModpack
 from .APModpackManager import get_items, get_locations, items_to_id, get_item_groups, get_location_groups, modpacks
 import Utils
@@ -17,9 +18,9 @@ from worlds.generic import Rules
 from .Mod import generate_mod
 from .FactorioOptions import (FactorioOptions, Silo, Satellite, TechTreeInformation, Goal,
                               TechCostDistribution, option_groups)
-from .FactorioRules import InternalItemRule, TechRule, AndRule, OrRule, process_yaml_rule, Rule
+from .FactorioRules import process_yaml_rule, Rule, NodeRule
 from .RandomGameItems import RandomGameItems
-from .RecipeEngine.NodeComponents.LogicComponents import MultiLogicComponent
+from .RecipeEngine.NodeComponents.LogicComponents import MultiLogicComponent, AnyLogic
 from .RecipeEngine.Nodes import RecipeNode, ItemNode
 from .Shapes import get_shapes
 from .FactorioSettings import FactorioSettings
@@ -98,7 +99,7 @@ class FactorioBobs(World):
 
     def __init__(self, world, player: int):
         super(FactorioBobs, self).__init__(world, player)
-        self.additional_logic: dict[int, AndRule] = {}
+        self.additional_logic: dict[int, Rule] = {}
         self.progression_technologies: set[Technology] = set()
         # self.custom_recipes : typing.Dict[str, GameRecipe] = {}
         # self.custom_products: dict[str, GameItem] = {}
@@ -203,12 +204,6 @@ class FactorioBobs(World):
                                      for complexity, yaml_rule in self.options.custom_additional_logic.value.items()}
         else:
             raise OptionError("additional_logic is invalid type")
-
-
-        for complexity, rule in self.additional_logic.items():
-            if complexity <= self.options.number_of_science_packs.value:
-                for tech in rule.needed_items():
-                    self.progression_technologies.add(self.modpack.technology_table[tech])
 
         # handle marking progressive techs as advancement
         prog_add = set()
@@ -327,6 +322,16 @@ class FactorioBobs(World):
 
     def set_rules(self):
         player = self.player
+
+        for node in self.modpack.game_item_manager.recipe_engine.nodes.values():
+            component: MultiLogicComponent
+            if not MultiLogicComponent in node.components:
+                component = node.register_component(MultiLogicComponent)
+            else:
+                component = node.get_component(MultiLogicComponent)
+
+            component.worlds[player] = AnyLogic(node, player)
+
         shapes = get_shapes(self)
 
         science_packs = self.modpack.ordered_science_packs[:self.options.number_of_science_packs]
@@ -334,46 +339,35 @@ class FactorioBobs(World):
             if science_pack == "automation-science-pack":
                 continue
             location = self.get_location(f"Automate {science_pack}")
-            optimized_rule = self.get_science_pack_rule(complexity)
-            Rules.set_rule(location, lambda state, location_rule = optimized_rule: location_rule.eval(self, state))
+
+            science_pack_node = self.modpack.game_item_manager.get_item_node(science_pack)
+            rule = NodeRule(science_pack_node) & self.additional_logic[complexity]
+            self.set_rule(location, rule)
 
         for location in self.science_locations:
-            Rules.set_rule(location, lambda state: True)
-            for ingredient_name in location.ingredients:
-                Rules.add_rule(location, lambda state, lambda_ingredient=ingredient_name: state.has(f"Automated {lambda_ingredient}", player))
-            # Rules.set_rule(location, lambda state, ingredients=frozenset(location.ingredients):
-            #     all(state.has(f"Automated {ingredient}", player) for ingredient in ingredients))
+            rule = And(*(Has(f"Automated {ingredient_name}") for ingredient_name in location.ingredients))
             prerequisites = shapes.get(location)
             if prerequisites:
-                Rules.add_rule(location, lambda state, locations=frozenset(prerequisites):
-                    all(state.can_reach(loc) for loc in locations))
+                for prerequisite in prerequisites:
+                    rule &= CanReachLocation(prerequisite.name)
 
-        victory_tech: set[Technology] = set()
+            Rules.set_rule(location, rule)
+            # Rules.set_rule(location, lambda state, ingredients=frozenset(location.ingredients):
+            #     all(state.has(f"Automated {ingredient}", player) for ingredient in ingredients))
+
+        rocket_part_node = self.modpack.game_item_manager.get_item_node("rocket-part")
+        victory_rule: Rule = NodeRule(rocket_part_node)
         if self.options.silo != Silo.option_spawn:
-            victory_tech |= self.get_item_tech_req("rocket-silo")
-            victory_tech |= self.get_item_tech_req("cargo-landing-pad")
-        victory_tech |= self.get_item_tech_req("rocket-part")
-        if self.options.goal == Goal.option_satellite:
-            victory_tech |= self.get_item_tech_req("satellite")
-        victory_tech_names = set(tech.name for tech in victory_tech)
-        self.get_location("Rocket Launch").access_rule = lambda state: all(state.has(technology, player)
-                                                                           for technology in
-                                                                           victory_tech_names)
-        self.multiworld.completion_condition[player] = lambda state: state.has("Victory", player)
+            rocket_silo_node = self.modpack.game_item_manager.get_item_node("rocket-silo")
+            victory_rule &= NodeRule(rocket_silo_node)
 
-    def get_science_pack_rule(self, complexity: int) -> Rule:
-        science_pack = self.modpack.ordered_science_packs[complexity-1]
-        # science_pack_item: GameItem = self.get_internal_item(science_pack)
-        # if complexity in self.additional_logic:
-        #     rule = AndRule(InternalItemRule(science_pack_item), self.additional_logic[complexity])
-        # else:
-        #     rule = InternalItemRule(science_pack_item)
-        req_tech = self.get_item_tech_req(science_pack)
-        if complexity in self.additional_logic:
-            rule = AndRule(*(TechRule(tech) for tech in req_tech), self.additional_logic[complexity])
-        else:
-            rule = AndRule(*(TechRule(tech) for tech in req_tech))
-        return rule.optimize()
+            cargo_landing_pad_node = self.modpack.game_item_manager.get_item_node("cargo-landing-pad")
+            victory_rule &= NodeRule(cargo_landing_pad_node)
+
+        if self.options.goal == Goal.option_satellite:
+            satellite_node = self.modpack.game_item_manager.get_item_node("satellite")
+            victory_rule &= NodeRule(satellite_node)
+        self.set_completion_rule(victory_rule)
 
     def generate_basic(self):
         start_location_hints: typing.Set[str] = self.options.start_location_hints.value
@@ -426,7 +420,7 @@ class FactorioBobs(World):
                 spoiler_handle.write(f"\n{recipe.name} ({name}): {recipe.ingredients} -> {recipe.products}")
 
     # @staticmethod
-    # def get_category(ingredients: typing.Iterable[GameItem], preferred="crafting") -> str: # todo extract number of fluid input for categories
+    # def get_category(ingredients: typing.Iterable[GameItem], preferred="crafting") -> str:
     #     num_liquids = sum(1 for ingredient in ingredients if ingredient.is_fluid)
     #     categories = {0: preferred,
     #                   1: "crafting-with-fluid",
@@ -623,10 +617,8 @@ class FactorioBobs(World):
         #     needed_items.add(self.get_internal_item("cargo-landing-pad"))
         # if self.options.goal.value == Goal.option_satellite:
         #     needed_items.add(self.get_internal_item("satellite"))
-        needed_items = [tech for tech in self.modpack.base_technology_table.values() if tech.name in self.modpack.game_item_manager.technology_nodes] # todo reduce number
-
-        for item in needed_items:
-            self.progression_technologies |= self.get_item_tech_req(item.name)
+        needed_techs = [tech for tech in self.modpack.base_technology_table.values() if tech.name in self.modpack.game_item_manager.technology_nodes] # todo reduce number of useless progression technologies
+        self.progression_technologies |= needed_techs
 
 
     def create_item(self, name: str) -> FactorioItem:
