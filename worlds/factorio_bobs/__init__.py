@@ -19,7 +19,6 @@ from .Mod import generate_mod
 from .FactorioOptions import (FactorioOptions, Silo, Satellite, TechTreeInformation, Goal,
                               TechCostDistribution, option_groups)
 from .FactorioRules import process_yaml_rule, Rule, NodeRule
-from .RandomGameItems import RandomGameItems
 from .RecipeEngine.NodeComponents.LogicComponents import MultiLogicComponent, AnyLogic
 from .RecipeEngine.Nodes import RecipeNode, ItemNode
 from .Shapes import get_shapes
@@ -617,7 +616,7 @@ class FactorioBobs(World):
         #     needed_items.add(self.get_internal_item("cargo-landing-pad"))
         # if self.options.goal.value == Goal.option_satellite:
         #     needed_items.add(self.get_internal_item("satellite"))
-        needed_techs = [tech for tech in self.modpack.base_technology_table.values() if tech.name in self.modpack.game_item_manager.technology_nodes] # todo reduce number of useless progression technologies
+        needed_techs = {tech for tech in self.modpack.base_technology_table.values() if tech.name in self.modpack.game_item_manager.technology_nodes} # todo reduce number of useless progression technologies
         self.progression_technologies |= needed_techs
 
 
