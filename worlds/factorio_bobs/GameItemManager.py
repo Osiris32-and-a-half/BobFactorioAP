@@ -22,7 +22,7 @@ class GameItemManager:
 
         self.has_init = False
 
-        self.impossible_node = OrNode("Impossible")
+        self.impossible_node = self.recipe_engine.add_node(OrNode("Impossible"))
         self.technology_nodes: dict[str, TechnologyNode] = {}
         self.fluid_mining: set[RecipeNode] = set()
 
