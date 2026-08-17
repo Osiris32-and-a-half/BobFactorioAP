@@ -66,6 +66,8 @@ Output Logs/
 /datapackage
 /datapackage_export.json
 /custom_worlds
+/factorio_mods
+
 # stubgen output
 /out/
 
