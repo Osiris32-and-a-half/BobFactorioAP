@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Callable
+from typing import Callable, override
 
 from .BaseNodeComponent import BaseNodeComponent
 
@@ -57,17 +57,17 @@ class BaseLogic:
             callback(self.owner)
 
     def test_enable(self):
-        self.__pre_test_enable()
-        self.__test_enable()
-        self.__post_test_enable()
+        self._pre_test_enable()
+        self._test_enable()
+        self._post_test_enable()
 
-    def __pre_test_enable(self):
+    def _pre_test_enable(self):
         self.in_update: bool = True
 
-    def __test_enable(self):
+    def _test_enable(self):
         raise NotImplementedError(f"{self.__class__.__name__} not implemented.")
 
-    def __post_test_enable(self):
+    def _post_test_enable(self):
         self.in_update: bool = False
 
     def disable(self):
@@ -117,7 +117,8 @@ class BaseLogic:
             node.get_component(MultiLogicComponent).worlds[self.slotID].test_enable()
 
 class AnyLogic(BaseLogic):
-    def __test_enable(self) -> bool:
+    @override
+    def _test_enable(self) -> bool:
         if self.automate_path:
             return False
 
