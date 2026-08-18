@@ -374,31 +374,42 @@ class FactorioBobs(World):
             elif loc.revealed:
                 start_location_hints.add(loc.name)
 
-    def collect_item(self, state, item, remove=False):
-        if item.advancement and item.name in self.modpack.progressive_technology_table:
-            prog_table = self.modpack.progressive_technology_table[item.name].progressive
-            if remove:
-                for item_name in reversed(prog_table):
-                    if state.has(item_name, item.player):
-                        return item_name
-            else:
-                for item_name in prog_table:
-                    if not state.has(item_name, item.player):
-                        return item_name
-
-        return super(FactorioBobs, self).collect_item(state, item, remove)
+    # def collect_item(self, state, item, remove=False):
+    #     # if item.advancement and item.name in self.modpack.progressive_technology_table:
+    #     #     prog_table = self.modpack.progressive_technology_table[item.name].progressive
+    #     #     if remove:
+    #     #         for item_name in reversed(prog_table):
+    #     #             if state.has(item_name, item.player):
+    #     #                 return item_name
+    #     #     else:
+    #     #         for item_name in prog_table:
+    #     #             if not state.has(item_name, item.player):
+    #     #                 return item_name
+    #     return super(FactorioBobs, self).collect_item(state, item, remove)
 
     def collect(self, state: CollectionState, item: Item) -> bool:
         change = super().collect(state, item)
-        if change and item.name in self.modpack.game_item_manager.technology_nodes:
-            node = self.modpack.game_item_manager.technology_nodes[item.name]
+        item_name = item.name
+
+        if item_name in self.modpack.progressive_technology_table:
+            stage = state.count(item.name, self.player)
+            item_name = self.modpack.progressive_technology_table[item_name].progressive[stage-1]
+
+        if change and item_name in self.modpack.game_item_manager.technology_nodes:
+            node = self.modpack.game_item_manager.technology_nodes[item_name]
             component: MultiLogicComponent = node.get_component(MultiLogicComponent)
             component.worlds[self.player].force_enable()
         return change
 
     def remove(self, state: CollectionState, item: Item) -> bool:
         change = super().remove(state, item)
-        if change and item in self.modpack.game_item_manager.technology_nodes:
+        item_name = item.name
+
+        if item_name in self.modpack.progressive_technology_table:
+            stage = state.count(item.name, self.player)
+            item_name = self.modpack.progressive_technology_table[item_name].progressive[stage]
+
+        if change and item_name in self.modpack.game_item_manager.technology_nodes:
             node = self.modpack.game_item_manager.technology_nodes[item.name]
             component: MultiLogicComponent = node.get_component(MultiLogicComponent)
             component.worlds[self.player].disable()
