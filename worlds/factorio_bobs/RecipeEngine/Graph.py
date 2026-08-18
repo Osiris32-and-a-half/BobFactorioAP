@@ -16,6 +16,10 @@ class Graph(Generic[T]):
         if node.name in self.nodes:
             raise RuntimeError(f"Node ({node.name}) already exists")
         self.nodes[node.name] = node
+
+        for component in self.__components:
+            component.on_node_init(node)
+
         return node
 
     def register_component(self, component_class: type[T]) -> T:
