@@ -17,7 +17,7 @@ class Graph(Generic[T]):
             raise RuntimeError(f"Node ({node.name}) already exists")
         self.nodes[node.name] = node
 
-        for component in self.__components:
+        for component in self.__components.values():
             component.on_node_init(node)
 
         return node
