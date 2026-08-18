@@ -309,11 +309,7 @@ class FactorioBobs(World):
         player = self.player
 
         for node in self.modpack.game_item_manager.recipe_engine.nodes.values():
-            component: MultiLogicComponent
-            if not node.has_component(MultiLogicComponent):
-                component = node.register_component(MultiLogicComponent)
-            else:
-                component = node.get_component(MultiLogicComponent)
+            component: MultiLogicComponent = node.get_component(MultiLogicComponent)
 
             component.worlds[player] = AnyLogic(node, player)
 

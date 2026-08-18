@@ -4,6 +4,7 @@ import json
 from typing import TYPE_CHECKING
 
 from .RecipeEngine.Graph import Graph
+from .RecipeEngine.GraphComponents.GraphMultiLogic import GraphMultiLogic
 from .RecipeEngine.NodeComponents.BaseNodeComponent import BaseNodeComponent
 from .RecipeEngine.Nodes import ItemNode, RecipeNode, OrNode, Node
 
@@ -19,6 +20,7 @@ class GameItemManager:
         self.modpack = modpack
         self.name = self.modpack.packName
         self.recipe_engine = Graph()
+        self.recipe_engine.register_component(GraphMultiLogic)
 
         self.has_init = False
 
