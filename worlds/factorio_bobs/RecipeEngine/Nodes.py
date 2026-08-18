@@ -108,11 +108,3 @@ class OrNode(Node):
             if required in nodes:
                 return True
         return False
-
-class ItemNode(OrNode):
-    def __init__(self, name: str):
-        super().__init__(name)
-
-class RecipeNode(AndNode):
-    def __init__(self, name: str):
-        super().__init__(name)

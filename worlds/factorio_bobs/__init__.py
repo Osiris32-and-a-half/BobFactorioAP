@@ -5,24 +5,21 @@ import logging
 import random
 import typing
 
-from rule_builder.rules import Has, And, CanReachLocation
-from .FactorioModpack import FactorioModpack
-from .APModpackManager import get_items, get_locations, items_to_id, get_item_groups, get_location_groups, modpacks
 import Utils
 from BaseClasses import Region, Location, Item, Tutorial, ItemClassification, CollectionState
 from NetUtils import JSONMessagePart
-from Options import OptionError
+from rule_builder.rules import Has, And, CanReachLocation
 from worlds.AutoWorld import World, WebWorld
 from worlds.LauncherComponents import Component, components, Type, launch as launch_component
-from worlds.generic import Rules
-from .Mod import generate_mod
+from .APModpackManager import get_items, get_locations, items_to_id, get_item_groups, get_location_groups, modpacks
+from .FactorioModpack import FactorioModpack
 from .FactorioOptions import (FactorioOptions, Silo, Satellite, TechTreeInformation, Goal,
                               TechCostDistribution, option_groups)
 from .FactorioRules import process_yaml_rule, Rule, NodeRule
-from .RecipeEngine.NodeComponents.LogicComponents import MultiLogicComponent, AnyLogic
-from .RecipeEngine.Nodes import RecipeNode, ItemNode
-from .Shapes import get_shapes
 from .FactorioSettings import FactorioSettings
+from .Mod import generate_mod
+from .RecipeEngine.NodeComponents.LogicComponents import MultiLogicComponent, AnyLogic
+from .Shapes import get_shapes
 from .Technologies import Technology
 from ..factorio.Technologies import CustomTechnology
 

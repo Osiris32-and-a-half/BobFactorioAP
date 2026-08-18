@@ -7,7 +7,7 @@ from .RecipeEngine.Graph import Graph
 from .RecipeEngine.GraphComponents.GraphMultiLogic import GraphMultiLogic
 from .RecipeEngine.NodeComponents.BaseNodeComponent import BaseNodeComponent
 from .RecipeEngine.NodeComponents.LogicComponents import MultiLogicComponent
-from .RecipeEngine.Nodes import ItemNode, RecipeNode, OrNode, Node, AndNode, T
+from .RecipeEngine.Nodes import OrNode, Node, AndNode, T
 
 if TYPE_CHECKING:
     from . import FactorioModpack
@@ -56,7 +56,7 @@ class GameItemManager:
 
         for fluid in fluids:
             ingredient = ItemNode(f"item_{fluid}")
-            info: FactorioItemComponent = ingredient.register_component(FactorioItemComponent)
+            info: FactorioItemComponent = ingredient.get_component(FactorioItemComponent)
             info.is_fluid = True
             self.recipe_engine.add_node(ingredient)
             if fluid in invalid_items:
@@ -67,7 +67,7 @@ class GameItemManager:
 
         for item, stack_size in item_stack_sizes.items():
             ingredient = ItemNode(f"item_{item}")
-            info: FactorioItemComponent = ingredient.register_component(FactorioItemComponent)
+            info: FactorioItemComponent = ingredient.get_component(FactorioItemComponent)
             info.item_stack_size = stack_size
             self.recipe_engine.add_node(ingredient)
             if ingredient.name in self.modpack.ordered_science_packs or ingredient.name in invalid_items:
@@ -257,7 +257,6 @@ class GameItemManager:
             node = self.recipe_engine.add_node(ItemNode(f"item_{item}"))
             assert type(node) is ItemNode
             node: ItemNode
-            node.register_component(FactorioItemComponent)
             return node
         node: Node = self.recipe_engine.nodes[f"item_{item}"]
         assert isinstance(node, ItemNode)
@@ -275,6 +274,14 @@ class GameItemManager:
         assert isinstance(category, CategoryNode)
         category: CategoryNode
         return category
+
+class ItemNode(OrNode):
+    def __init__(self, name: str):
+        super().__init__(name)
+        self.register_component(FactorioItemComponent)
+
+class RecipeNode(AndNode):
+    pass
 
 class CategoryNode(OrNode):
     pass
