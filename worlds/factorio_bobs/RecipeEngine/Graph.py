@@ -25,7 +25,7 @@ class Graph(Generic[T]):
     def register_component(self, component_class: type[T]) -> T:
         if component_class in self.__components:
             raise RuntimeError(f"{self} tried to register {component_class.__name__} twice")
-        self.__components[component_class] = component_class()
+        self.__components[component_class] = component_class(self)
         return self.__components[component_class]
 
     def get_component(self, component_class: type[T]) -> T:
