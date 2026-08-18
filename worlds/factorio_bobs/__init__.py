@@ -645,11 +645,11 @@ class FactorioBobs(World):
                                             },
                                             FactorioBobs.SLOT_MODPACK_NAME_KEY: self.options.packname.current_key,
                                             FactorioBobs.SLOT_RANDOM_RECIPES_KEY: {}}
-        for recipe in self.custom_recipes.values():
-            ingredients = []
-            for ingredient in recipe.ingredients:
-                ingredients.append(ingredient.name)
-            slot_data[FactorioBobs.SLOT_RANDOM_RECIPES_KEY][recipe.name] = ingredients
+        # for recipe in self.custom_recipes.values():
+        #     ingredients = []
+        #     for ingredient in recipe.ingredients:
+        #         ingredients.append(ingredient.name)
+        #     slot_data[FactorioBobs.SLOT_RANDOM_RECIPES_KEY][recipe.name] = ingredients
         return slot_data
 
     def explain_more(self, argument: str, state: CollectionState) -> list[JSONMessagePart]:
