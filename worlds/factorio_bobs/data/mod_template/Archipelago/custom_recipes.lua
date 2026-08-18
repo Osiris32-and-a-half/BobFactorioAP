@@ -27,24 +27,12 @@ local function add_normal_custom_recipe(name, category, energy, ingredients, pro
     end
 end
 
-{%- for recipe_name, recipe in recipes.items() %}
-{%- if recipe.source.value == 2 %}
-add_normal_custom_recipe(
-    "{{recipe_name}}",
-    "{{recipe.category.name}}",
-    {{recipe.energy}},
-    {{dict_to_recipe(recipe.ingredients)}},
-    {{dict_to_recipe(recipe.products)}},
-    {{variable_to_lua(recipe.productivity)}}
-)
-{%- endif %}
-{%- endfor %}
 
 {%- for recipe_name, recipe in custom_recipes.items() %}
 add_normal_custom_recipe(
 {# todo add check for non-standard recipe categories #}
     "{{recipe_name}}",
-    "{{recipe.category.name}}",
+    "{{recipe.category}}",
     {{recipe.energy}},
     {{dict_to_recipe(recipe.ingredients)}},
     {{dict_to_recipe(recipe.products)}},

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from math import floor
 from typing import TYPE_CHECKING
 
 from .RecipeEngine.Graph import Graph
@@ -25,8 +26,10 @@ class GameItemManager:
 
         self.has_init = False
 
-        self.impossible_node = self.recipe_engine.add_node(OrNode("Impossible"))
         self.technology_nodes: dict[str, TechnologyNode] = {}
+        self.imported_recipes: dict[str, RecipeNode] = {}
+        self.custom_recipes: dict[str, RecipeNode] = {}
+        self.impossible_node = self.recipe_engine.add_node(OrNode("Impossible"))
         self.fluid_mining: set[RecipeNode] = set()
 
         self.character_node: Node = self.recipe_engine.add_node(OrNode("Character"))
@@ -126,6 +129,8 @@ class GameItemManager:
             # example "wheat-seeds":{"ingredients":{"wood":100},"products":{"wheat-seeds":1},"category":"organic-synth-recipes","energy":30}
             recipe = self.recipe_engine.add_node(RecipeNode(f"recipe_{recipe_name}"))
 
+            self.imported_recipes[recipe_name] = recipe
+
             recipe.cost = recipe_data["energy"]
 
             recipe.add_required(self.get_single_category_node(recipe_data["category"]), 0)
@@ -173,7 +178,9 @@ class GameItemManager:
             # TODO add optional crafting_machine_tints
             # TODO add group for AP recipes
             # TODO add support for custom techs for recipes
-            recipe = self.recipe_engine.add_node(RecipeNode(recipe_name))
+            recipe = self.recipe_engine.add_node(RecipeNode(f"recipe_{recipe_name}"))
+
+            self.custom_recipes[recipe_name] = recipe
 
             recipe.cost = recipe_data["energy"]
 
@@ -266,7 +273,7 @@ class GameItemManager:
     def get_recipe_node(self, recipe: str) -> RecipeNode:
         node: Node = self.recipe_engine.nodes[f"recipe_{recipe}"]
         assert isinstance(node, RecipeNode)
-        node: ItemNode
+        node: RecipeNode
         return node
 
     def get_single_category_node(self, category: str) -> CategoryNode:
@@ -281,7 +288,9 @@ class ItemNode(OrNode):
         self.register_component(FactorioItemComponent)
 
 class RecipeNode(AndNode):
-    pass
+    def __init__(self, name: str):
+        super().__init__(name)
+        self.register_component(FactorioRecipeComponent)
 
 class CategoryNode(OrNode):
     pass
@@ -308,3 +317,37 @@ class FactorioItemComponent(BaseNodeComponent):
         self.item_stack_size: None | int = None
 
         self.invalid_for_first_recipe_pool = False
+
+class FactorioRecipeComponent(BaseNodeComponent):
+    def __init__(self, owner: Node):
+        super().__init__(owner)
+        self.productivity: bool | None = None
+
+    @property
+    def energy(self) -> int:
+        return self.owner.cost
+
+    @property
+    def category(self) -> str:
+        for node in self.owner.required:
+            if isinstance(node, CategoryNode):
+                return node.name[9:]
+        raise Exception(f"couldn't find category for {self.owner.name}")
+
+    @property
+    def ingredients(self) -> dict[str, int]:
+        ret: dict[str, int] = {}
+        for ingredient in self.owner.required:
+            if not isinstance(ingredient, ItemNode):
+                continue
+            ret[ingredient.name[5:]] = floor(1/ingredient.used_by[self.owner])
+        return ret
+
+    @property
+    def products(self) -> dict[str, int]:
+        ret: dict[str, int] = {}
+        for product in self.owner.required:
+            if not isinstance(product, ItemNode):
+                continue
+            ret[product.name[5:]] = floor(self.owner.used_by[product])
+        return ret

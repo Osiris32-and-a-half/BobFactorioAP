@@ -12,6 +12,7 @@ import jinja2
 import Utils
 import worlds.Files
 from .FactorioOptions import RecipeTime, Silo, Satellite
+from .GameItemManager import FactorioRecipeComponent
 
 if TYPE_CHECKING:
     from . import FactorioBobs
@@ -107,7 +108,7 @@ def generate_mod(world: "FactorioBobs", output_directory: str):
                  for location in world.science_locations]
     mod_name = f"AP-{multiworld.seed_name}-P{player}-{multiworld.get_file_safe_player_name(player)}"
     versioned_mod_name = mod_name + "_" + Utils.__version__
-    custom_recipes = world.custom_recipes.copy()
+    # custom_recipes = world.custom_recipes.copy()
 
     def flop_random(low, high, base=None):
         """Guarantees 50% below base and 50% above base, uniform distribution in each direction."""
@@ -129,6 +130,12 @@ def generate_mod(world: "FactorioBobs", output_directory: str):
         # 32 bit uint
         map_basic_settings["seed"] = world.random.randint(0, 2 ** 32 - 1)
 
+    imported_recipe_info = {name: node.get_component(FactorioRecipeComponent)
+                            for name, node in world.modpack.game_item_manager.imported_recipes.items()}
+
+    custom_recipe_info = {name: node.get_component(FactorioRecipeComponent)
+                          for name, node in world.modpack.game_item_manager.custom_recipes.items()}
+
     template_data = {
         "locations": locations,
         "player_names": multiworld.player_name,
@@ -142,7 +149,7 @@ def generate_mod(world: "FactorioBobs", output_directory: str):
         "slot_name": world.player_name,
         "seed_name": multiworld.seed_name,
         "slot_player": player,
-        "recipes": world.modpack.game_item_manager.recipes,
+        "recipes": imported_recipe_info,
         "random": random,
         "flop_random": flop_random,
         "recipe_time_scale": recipe_time_scales.get(world.options.recipe_time.value, None),
@@ -151,9 +158,9 @@ def generate_mod(world: "FactorioBobs", output_directory: str):
         "free_sample_quality_name": world.options.free_samples_quality.current_key,
         "progressive_technology_table": {tech.name: tech.progressive for tech in
                                          world.modpack.progressive_technology_table.values()},
-        "custom_recipes": custom_recipes,
+        "custom_recipes": custom_recipe_info,
         "removed_technologies": world.removed_technologies,
-        "all_ingredients": {name: item for name, item in world.modpack.game_item_manager.game_items.items() if item.is_valid},
+        # "all_ingredients": {name: item for name, item in world.modpack.game_item_manager.game_items.items() if item.is_valid},
         "want_progressives": world.want_progressives,
         "chunk_shuffle": 0,
         "mod_settings": world.modpack.mod_settings,
