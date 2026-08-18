@@ -11,6 +11,8 @@ class MultiLogicComponent(BaseNodeComponent):
     def __init__(self, node: Node):
         super().__init__(node)
 
+        self.promotion_node = False
+
         self.worlds: dict[int, BaseLogic] = {}
 
 class BaseLogic:
@@ -52,6 +54,9 @@ class BaseLogic:
         if not value and self.automate_path:
             self.automate_path = value
             return # automate_path setter does call back
+
+        if self.owner.get_component(MultiLogicComponent).promotion_node:
+            self.__automate_path = value
 
         for callback in self.callbacks:
             callback(self.owner)
@@ -126,12 +131,6 @@ class AnyLogic(BaseLogic):
             for node in self.owner.used_by.keys():
                 node.get_component(MultiLogicComponent).worlds[self.slotID].test_enable()
 
-        if self.owner.manual and not self.manual_path:
-            self.manual_path = True
-            propagate_update()
-            if self.automate_path:
-                return True
-
         if isinstance(self.owner, AndNode):
             automateable = True
             for node in self.owner.required:
@@ -139,8 +138,6 @@ class AnyLogic(BaseLogic):
                 if external_logic.automate_path:
                     continue
                 elif external_logic.manual_path:
-                    if self.owner.manual:
-                        continue
                     if self.manual_path:
                         return False
                     automateable = False
@@ -167,10 +164,7 @@ class AnyLogic(BaseLogic):
                     manual_path = node
 
             if manual_path:
-                if self.owner.manual:
-                    self.automate_path = manual_path
-                else:
-                    self.manual_path = manual_path
+                self.manual_path = manual_path
                 propagate_update()
                 return True
         else:

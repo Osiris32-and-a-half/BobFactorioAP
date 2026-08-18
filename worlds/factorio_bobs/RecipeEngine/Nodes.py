@@ -19,10 +19,6 @@ class Node(Generic[T]):
         # this is the cost of using this node itself for any generic cost algorithm
         self.cost = 0
 
-        # Can spontaneously crate node however all usage is classed as manual
-        # usage classification changes if all `required` aren't manual and another option for the node is available when catalyst
-        self.manual: bool = False
-
         self.__components: dict[type[T], T] = {}
 
     def __repr__(self):
