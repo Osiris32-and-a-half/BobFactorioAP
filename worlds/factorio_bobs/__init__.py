@@ -406,12 +406,13 @@ class FactorioBobs(World):
 
     @classmethod
     def stage_write_spoiler(cls, world, spoiler_handle):
-        factorio_players = world.get_game_players(cls.game)
-        spoiler_handle.write('\n\nFactorioBobs Recipes:\n')
-        for player in factorio_players:
-            name = world.get_player_name(player)
-            for recipe in world.worlds[player].custom_recipes.values():
-                spoiler_handle.write(f"\n{recipe.name} ({name}): {recipe.ingredients} -> {recipe.products}")
+        pass
+        # factorio_players = world.get_game_players(cls.game)
+        # spoiler_handle.write('\n\nFactorioBobs Recipes:\n')
+        # for player in factorio_players:
+        #     name = world.get_player_name(player)
+        #     for recipe in world.worlds[player].custom_recipes.values():
+        #         spoiler_handle.write(f"\n{recipe.name} ({name}): {recipe.ingredients} -> {recipe.products}")
 
     # @staticmethod
     # def get_category(ingredients: typing.Iterable[GameItem], preferred="crafting") -> str:
