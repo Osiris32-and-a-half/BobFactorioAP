@@ -14,7 +14,7 @@ from worlds.LauncherComponents import Component, components, Type, launch as lau
 from .APModpackManager import get_items, get_locations, items_to_id, get_item_groups, get_location_groups, modpacks
 from .FactorioModpack import FactorioModpack
 from .FactorioOptions import (FactorioOptions, Silo, Satellite, TechTreeInformation, Goal,
-                              TechCostDistribution, option_groups)
+                              TechCostDistribution, option_groups, TechLayerObscurity, TechDepthObscurity)
 from .FactorioRules import process_yaml_rule, Rule, NodeRule
 from .FactorioSettings import FactorioSettings
 from .Mod import generate_mod
@@ -102,6 +102,8 @@ class FactorioBobs(World):
         self.tech_tree_layout_prerequisites = {}
         self.modpack: FactorioModpack | None = None
         self.removed_technologies: set[str] = set()
+
+        self.techs_to_hint = {}
 
         self.logger = logging.getLogger(f"{self.game}:{self.player}")
 
@@ -675,6 +677,44 @@ class FactorioBobs(World):
                     {"text": f"science pack not craftable: {packs_needed}\n"}]
         else:
             return [{"text": "Invalid argument only input science pack/location\n"}]
+
+    def post_fill(self) -> None:
+
+        start_location_hints: typing.Set[str] = self.options.start_location_hints.value
+        advancement_only: bool = self.options.tech_tree_information.value == TechTreeInformation.option_full_only_hint_advancement
+        full_hints: bool = self.options.tech_tree_information.value == TechTreeInformation.option_full
+
+        def set_propper_hint(loc, pre_hint):
+            # show start_location_hints ingame
+            if loc.name in start_location_hints:
+                loc.revealed = True
+            # make spoiler match mod info
+            elif pre_hint:
+                if loc.revealed:
+                    if advancement_only:
+                        if loc.item.advancement:
+                            start_location_hints.add(loc.name)
+                    else:
+                        start_location_hints.add(loc.name)
+
+            if loc.revealed:
+                if full_hints:
+                    self.techs_to_hint[f"ap-{self.location_name_to_id[loc.name]}-"] = True
+                else:
+                    if loc.item.advancement:
+                        self.techs_to_hint[f"ap-{self.location_name_to_id[loc.name]}-"] = True
+                    else:
+                        self.techs_to_hint[f"ap-{self.location_name_to_id[loc.name]}-"] = False
+            else:
+                self.techs_to_hint[f"ap-{self.location_name_to_id[loc.name]}-"] = False
+
+        for loc in self.science_locations:
+            set_propper_hint(loc,
+                             self.options.tech_layer_obscurity == TechLayerObscurity.disabled and self.options.tech_depth_obscurity == TechDepthObscurity.option_disabled)
+
+        # for loc in self.craftsanity_locations:
+        #    set_propper_hint(loc, self.options.tech_craft_obscurity == TechCraftObscurity.disabled)
+
 
 class FactorioLocation(Location):
     game: str = FactorioBobs.game
