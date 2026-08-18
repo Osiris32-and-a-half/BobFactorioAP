@@ -6,7 +6,8 @@ from typing import TYPE_CHECKING
 from .RecipeEngine.Graph import Graph
 from .RecipeEngine.GraphComponents.GraphMultiLogic import GraphMultiLogic
 from .RecipeEngine.NodeComponents.BaseNodeComponent import BaseNodeComponent
-from .RecipeEngine.Nodes import ItemNode, RecipeNode, OrNode, Node
+from .RecipeEngine.NodeComponents.LogicComponents import MultiLogicComponent
+from .RecipeEngine.Nodes import ItemNode, RecipeNode, OrNode, Node, AndNode, T
 
 if TYPE_CHECKING:
     from . import FactorioModpack
@@ -27,6 +28,8 @@ class GameItemManager:
         self.impossible_node = self.recipe_engine.add_node(OrNode("Impossible"))
         self.technology_nodes: dict[str, TechnologyNode] = {}
         self.fluid_mining: set[RecipeNode] = set()
+
+        self.character_node: Node = self.recipe_engine.add_node(OrNode("Character"))
 
         self.__dif_entity_to_item: dict[str, str] | None = None
 
@@ -83,16 +86,20 @@ class GameItemManager:
         for entity, categories in raw_machines.items():
             if entity == "character":
                 for category in categories:
+                    get_or_create_category(category).add_required(self.character_node, 0)
                     get_or_create_category(category).manual = True
-                get_or_create_category("basic-crafting").manual = True # somehow this is implied and not exported
-                get_or_create_category("basic-solid").manual = True # this is not a crafting category so not extracted todo look if some ores can't do this
+                get_or_create_category("basic-crafting").add_required(self.character_node, 0) # somehow this is implied and not exported
+                get_or_create_category("basic-solid").add_required(self.character_node, 0) # this is not a crafting category so not extracted todo look if some ores can't do this
                 continue
 
             item = self.get_item_from_entity(entity)
+            placed_entity = self.recipe_engine.add_node(PlacedEntityNode(f"placed_entity_{entity}"))
+            placed_entity.add_required(item, 0)
+
             if item.name == "assembling-machine-1":
-                get_or_create_category("crafting-with-fluid").add_required(item, 0) # mod enables this todo: disable?
+                get_or_create_category("crafting-with-fluid").add_required(placed_entity, 0) # mod enables this todo: disable?
             for category in categories:
-                get_or_create_category(category).add_required(item, 0)
+                get_or_create_category(category).add_required(placed_entity, 0)
 
     def __register_recipes(self):
         with self.modpack.open_file("Extractor/resources.json") as file:  # todo find better method then opening twice
@@ -277,6 +284,15 @@ class TechnologyNode(OrNode):
 
 class MultiTechnologyNode(OrNode):
     pass
+
+class PlacedEntityNode(AndNode):
+    def register_component(self, component_class: type[T]) -> T:
+        component = super().register_component(component_class)
+        if component_class is MultiLogicComponent:
+            component: MultiLogicComponent
+            component.promotion_node = True
+        return component
+
 
 class FactorioItemComponent(BaseNodeComponent):
     def __init__(self, owner: Node):

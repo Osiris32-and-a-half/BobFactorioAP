@@ -310,8 +310,11 @@ class FactorioBobs(World):
 
         for node in self.modpack.game_item_manager.recipe_engine.nodes.values():
             component: MultiLogicComponent = node.get_component(MultiLogicComponent)
-
             component.worlds[player] = AnyLogic(node, player)
+
+        character_component: MultiLogicComponent = self.modpack.game_item_manager.character_node.get_component(MultiLogicComponent)
+        character_component.worlds[player].manual_path = True
+        character_component.worlds[player].propagate_update()
 
         shapes = get_shapes(self)
 

@@ -118,6 +118,9 @@ class BaseLogic:
 
     def force_enable(self):
         self.automate_path = True
+        self.propagate_update()
+
+    def propagate_update(self):
         for node in self.owner.used_by.keys():
             node.get_component(MultiLogicComponent).worlds[self.slotID].test_enable()
 
@@ -126,10 +129,6 @@ class AnyLogic(BaseLogic):
     def _test_enable(self) -> bool:
         if self.automate_path:
             return False
-
-        def propagate_update():
-            for node in self.owner.used_by.keys():
-                node.get_component(MultiLogicComponent).worlds[self.slotID].test_enable()
 
         if isinstance(self.owner, AndNode):
             automateable = True
@@ -149,7 +148,7 @@ class AnyLogic(BaseLogic):
             else:
                 self.manual_path = True
 
-            propagate_update()
+            self.propagate_update()
 
             return True
         elif isinstance(self.owner, OrNode):
@@ -158,17 +157,17 @@ class AnyLogic(BaseLogic):
                 external_logic = node.get_component(MultiLogicComponent).worlds[self.slotID]
                 if external_logic.automate_path:
                     self.automate_path = node
-                    propagate_update()
+                    self.propagate_update()
                     return True
                 elif not self.manual_path and external_logic.manual_path:
                     manual_path = node
 
             if manual_path:
                 self.manual_path = manual_path
-                propagate_update()
+                self.propagate_update()
                 return True
         else:
             self.automate_path = True
-            propagate_update()
+            self.propagate_update()
             return True
         return False
