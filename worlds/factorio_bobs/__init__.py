@@ -328,8 +328,8 @@ class FactorioBobs(World):
             rule = NodeRule(science_pack_node)
 
             if self.options.additional_logic.value == self.options.additional_logic.option_default:
-                if complexity in self.modpack.default_options["additional_logic"].keys():
-                    additional_logic_rule = process_yaml_rule(self.modpack.default_options["additional_logic"][str(complexity)], self.modpack)
+                if complexity in self.modpack.default_options["additional_logic"]:
+                    additional_logic_rule = process_yaml_rule(self.modpack.default_options["additional_logic"][complexity], self.modpack)
                     rule &= additional_logic_rule
             elif self.options.additional_logic.value == self.options.additional_logic.option_custom:
                 if complexity in self.options.custom_additional_logic.value.keys():
