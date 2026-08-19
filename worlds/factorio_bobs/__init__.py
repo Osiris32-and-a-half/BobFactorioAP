@@ -15,10 +15,10 @@ from .APModpackManager import get_items, get_locations, items_to_id, get_item_gr
 from .FactorioModpack import FactorioModpack
 from .FactorioOptions import (FactorioOptions, Silo, Satellite, TechTreeInformation, Goal,
                               TechCostDistribution, option_groups, TechLayerObscurity, TechDepthObscurity)
-from .FactorioRules import process_yaml_rule, Rule, NodeRule
+from .FactorioRules import process_yaml_rule, Rule, NodeRule, AnyLogic
 from .FactorioSettings import FactorioSettings
 from .Mod import generate_mod
-from .RecipeEngine.NodeComponents.LogicComponents import MultiLogicComponent, AnyLogic
+from .RecipeEngine.NodeComponents.LogicComponents import MultiLogicComponent
 from .Shapes import get_shapes
 from .Technologies import Technology
 from ..factorio.Technologies import CustomTechnology
@@ -144,6 +144,13 @@ class FactorioBobs(World):
             raise Exception(f"Modpack name '{modpack_name}' not found.")
         self.modpack = modpacks[modpack_name]
         self.modpack.init_pack_check()
+
+        state = self.multiworld.state
+        state.node_logic[self.player] = {node: AnyLogic(node, self.player, state)
+                                         for node in self.modpack.game_item_manager.recipe_engine.nodes.values()}
+        character_logic: AnyLogic = state.node_logic[self.player][self.modpack.game_item_manager.character_node]
+        character_logic.manual_path = True
+        character_logic.propagate_update()
 
         self.removed_technologies = self.modpack.removed_technologies.copy()
         self.options.number_of_science_packs.value = min(len(self.modpack.ordered_science_packs), self.options.number_of_science_packs.value)
@@ -306,14 +313,7 @@ class FactorioBobs(World):
 
     def set_rules(self):
         player = self.player
-
-        for node in self.modpack.game_item_manager.recipe_engine.nodes.values():
-            component: MultiLogicComponent = node.get_component(MultiLogicComponent)
-            component.worlds[player] = AnyLogic(node, player)
-
-        character_component: MultiLogicComponent = self.modpack.game_item_manager.character_node.get_component(MultiLogicComponent)
-        character_component.worlds[player].manual_path = True
-        character_component.worlds[player].propagate_update()
+        game_item_manager = self.modpack.game_item_manager
 
         shapes = get_shapes(self)
 
@@ -323,7 +323,7 @@ class FactorioBobs(World):
                 continue
             location = self.get_location(f"Automate {science_pack}")
 
-            science_pack_node = self.modpack.game_item_manager.get_item_node(science_pack)
+            science_pack_node = game_item_manager.get_item_node(science_pack)
 
             rule = NodeRule(science_pack_node)
 
@@ -349,17 +349,17 @@ class FactorioBobs(World):
             # Rules.set_rule(location, lambda state, ingredients=frozenset(location.ingredients):
             #     all(state.has(f"Automated {ingredient}", player) for ingredient in ingredients))
 
-        rocket_part_node = self.modpack.game_item_manager.get_item_node("rocket-part")
+        rocket_part_node = game_item_manager.get_item_node("rocket-part")
         victory_rule: Rule = NodeRule(rocket_part_node)
         if self.options.silo != Silo.option_spawn:
-            rocket_silo_node = self.modpack.game_item_manager.get_item_node("rocket-silo")
+            rocket_silo_node = game_item_manager.get_item_node("rocket-silo")
             victory_rule &= NodeRule(rocket_silo_node)
 
-            cargo_landing_pad_node = self.modpack.game_item_manager.get_item_node("cargo-landing-pad")
+            cargo_landing_pad_node = game_item_manager.get_item_node("cargo-landing-pad")
             victory_rule &= NodeRule(cargo_landing_pad_node)
 
         if self.options.goal == Goal.option_satellite:
-            satellite_node = self.modpack.game_item_manager.get_item_node("satellite")
+            satellite_node = game_item_manager.get_item_node("satellite")
             victory_rule &= NodeRule(satellite_node)
         self.set_completion_rule(victory_rule)
 
@@ -397,8 +397,7 @@ class FactorioBobs(World):
 
         if change and item_name in self.modpack.game_item_manager.technology_nodes:
             node = self.modpack.game_item_manager.technology_nodes[item_name]
-            component: MultiLogicComponent = node.get_component(MultiLogicComponent)
-            component.worlds[self.player].force_enable()
+            state.node_logic[self.player][node].force_enable()
         return change
 
     def remove(self, state: CollectionState, item: Item) -> bool:
@@ -411,8 +410,7 @@ class FactorioBobs(World):
 
         if change and item_name in self.modpack.game_item_manager.technology_nodes:
             node = self.modpack.game_item_manager.technology_nodes[item.name]
-            component: MultiLogicComponent = node.get_component(MultiLogicComponent)
-            component.worlds[self.player].disable()
+            state.node_logic[self.player][node].disable()
         return change
 
     @classmethod
