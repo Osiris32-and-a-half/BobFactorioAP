@@ -346,7 +346,7 @@ class FactorioRecipeComponent(BaseNodeComponent):
     @property
     def products(self) -> dict[str, int]:
         ret: dict[str, int] = {}
-        for product in self.owner.required:
+        for product in self.owner.used_by:
             if not isinstance(product, ItemNode):
                 continue
             ret[product.name[5:]] = floor(self.owner.used_by[product])
