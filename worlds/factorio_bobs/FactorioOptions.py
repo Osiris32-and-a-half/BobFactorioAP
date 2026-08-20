@@ -61,6 +61,7 @@ class AdditionalRocketPool(DefaultOnToggle):
     It Doesn't affect the difficulty of the rocket but lowers the difficulty of science packs slightly.
     """
     display_name = "Additional Rocket Pool"
+    visibility = Visibility.spoiler
 
 
 class PercentItemsInGame(Range):
@@ -72,12 +73,14 @@ class PercentItemsInGame(Range):
     range_start = 30
     range_end = 100
     default = 90
+    visibility = Visibility.spoiler
 
 class NoEarlierPools(Toggle):
     """When enabled when randomizing recipes, no earlier item pools will be considered for ingredients.
     This will drastically increase the difficulty you've been warned.
     """
     display_name = "No Earlier Pools"
+    visibility = Visibility.spoiler
 
 
 class Goal(Choice):
@@ -186,9 +189,9 @@ class Silo(Choice):
     """Ingredients to craft rocket silo or auto-place if set to spawn."""
     display_name = "Rocket Silo"
     option_vanilla = 0
-    option_randomize_recipe = 1
+    # option_randomize_recipe = 1
     option_spawn = 2
-    default = 1
+    default = 0
 
 
 class Satellite(Choice):
@@ -197,6 +200,7 @@ class Satellite(Choice):
     option_vanilla = 0
     option_randomize_recipe = 1
     default = 1
+    visibility = Visibility.spoiler
 
 
 class FreeSamples(Choice):
@@ -304,6 +308,7 @@ class RecipeIngredients(Choice):
     option_rocket = 0
     option_science_pack = 1
     default = 1
+    visibility = Visibility.spoiler
 
 
 class RecipeIngredientsOffset(Range):
@@ -312,6 +317,7 @@ class RecipeIngredientsOffset(Range):
     display_name = "Randomized Recipe Ingredients Offset"
     range_start = -1
     range_end = 5
+    visibility = Visibility.spoiler
 
 
 class FactorioStartItems(OptionDict):
