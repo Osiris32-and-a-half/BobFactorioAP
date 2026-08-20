@@ -174,8 +174,8 @@ def generate_mod(world: "FactorioBobs", output_directory: str):
             continue
         template_data[factorio_option] = factorio_option_instance.value
 
-    if world.options.silo == Silo.option_randomize_recipe:
-        template_data["free_sample_blacklist"]["rocket-silo"] = True
+    # if world.options.silo == Silo.option_randomize_recipe:
+    #     template_data["free_sample_blacklist"]["rocket-silo"] = True
 
     if world.options.satellite == Satellite.option_randomize_recipe:
         template_data["free_sample_blacklist"]["satellite"] = True
