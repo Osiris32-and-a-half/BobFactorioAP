@@ -82,7 +82,7 @@ class FactorioCommandProcessor(ClientCommandProcessor):
 
 class FactorioContext(CommonContext):
     command_processor = FactorioCommandProcessor
-    game = "Factorio Bob's"
+    game = "Factorio Modpacks"
     items_handling = 0b111  # full remote
 
     # updated by spinup server

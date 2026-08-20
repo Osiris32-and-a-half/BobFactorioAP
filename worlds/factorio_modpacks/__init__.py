@@ -27,10 +27,10 @@ modpacks: dict[str, FactorioModpack]
 
 def launch_client(*args: str):
     from .Client import launch
-    launch_component(launch, name="Factorio Bob's Client", args=args)
+    launch_component(launch, name="Factorio Modpacks Client", args=args)
 
 
-components.append(Component("FactorioBobs Client", func=launch_client, component_type=Type.CLIENT))
+components.append(Component("Factorio Modpacks Client", func=launch_client, component_type=Type.CLIENT))
 
 
 class FactorioBobsWeb(WebWorld):
@@ -46,7 +46,7 @@ class FactorioBobsWeb(WebWorld):
 
 
 class FactorioItem(Item):
-    game = "Factorio Bob's"
+    game = "Factorio Modpacks"
 
 
 class FactorioBobs(World):
@@ -63,7 +63,7 @@ class FactorioBobs(World):
 
     logger: logging.Logger
 
-    game = "Factorio Bob's"
+    game = "Factorio Modpacks"
     location_pool: list[FactorioScienceLocation]
 
     item_name_to_id = get_items()

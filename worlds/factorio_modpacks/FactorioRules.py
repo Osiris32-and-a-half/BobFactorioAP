@@ -19,7 +19,7 @@ class GraphRuleContainer(LogicMixin):
 
     def init_mixin(self, multiworld: MultiWorld) -> None:
         self.node_logic = {}
-        for world in multiworld.get_game_worlds("Factorio Bob's"):
+        for world in multiworld.get_game_worlds("Factorio Modpacks"):
             player = world.player
             if world.modpack:
                 self.node_logic[player] = {node: AnyLogic(node, player, self)
