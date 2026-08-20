@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from Options import PerGameCommonOptions, TextChoice
-from worlds.factorio_bobs import modpacks
+from . import modpacks
 
 pack_doc = "\n".join([f"{pack.packName}: {pack.downloadLocation}" for pack in modpacks.values()])
 
