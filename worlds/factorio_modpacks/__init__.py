@@ -20,8 +20,7 @@ from .FactorioSettings import FactorioSettings
 from .Mod import generate_mod
 from .RecipeEngine.NodeComponents.LogicComponents import MultiLogicComponent
 from .Shapes import get_shapes
-from .Technologies import Technology
-from ..factorio.Technologies import CustomTechnology
+from .Technologies import Technology, CustomTechnology
 
 modpacks: dict[str, FactorioModpack]
 
