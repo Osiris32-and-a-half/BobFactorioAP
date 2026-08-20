@@ -242,13 +242,11 @@ for tech_name, tech in pairs(technologies) do
             local pure_tech_name = string.gsub(tech_name, "-%d$", "")
             local tech_number = string.gsub(tech_name, "^.+-", "")
             temp_tech_localisation = {"", {"technology-name."..pure_tech_name}, " "..tech_number}
-            log(serpent.line(temp_tech_localisation))
         end
         for _, effect in pairs(tech.effects) do
             local tech_localised = tech.localised_name or temp_tech_localisation or  {"technology-name."..tech_name}
             if effect.type == "unlock-recipe" then
                 local recipe = data.raw.recipe[effect.recipe]
-                log(recipe.name..": "..serpent.line(tech_localised))
                 local order = recipe.custom_tool_tip_order or 40
                 add_custom_tooltip_field(recipe, {"factoriopedia.recipe-unlock"}, tech_localised, false, order)
                 if tech.archipelago_controlled then
