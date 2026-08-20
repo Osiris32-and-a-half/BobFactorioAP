@@ -78,8 +78,6 @@ if mods["science-not-invited"] then
     SNI.setWeights(weights)
 end
 
-
-
 data:extend({{
         type           = "technology",
         name           = "crash-prevention",
@@ -88,16 +86,26 @@ data:extend({{
         research_trigger = {
             type = "scripted",
         },
-        prerequisites = {"crash-prevention-lock"}
+        prerequisites = {"AP-lock"}
     },
     {
         type           = "technology",
-        name           = "crash-prevention-lock",
+        name           = "AP-lock",
         hidden         = true,
         icon           = "__base__/graphics/icons/small-scorchmark.png",
         icon_size      = 64,
         research_trigger = {
             type = "scripted",
         },
+        unit = {
+            time = math.huge,
+            count = 18446600073709551614,
+            ingredients = {},
+        },
+        prerequisites = {},
     },
 })
+
+for _, name in pairs(general.science_packs.allowed) do
+    table.insert(data.raw.technology["AP-lock"].unit.ingredients, {name, 65535})
+end
