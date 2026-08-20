@@ -235,21 +235,26 @@ for _, name in pairs(general.technologies.removed_technologies()) do
     researched_techs[name] = true
 end
 
-
 for tech_name, tech in pairs(technologies) do
     if not researched_techs[tech_name] and tech.effects then
+        local temp_tech_localisation
+        if string.find(tech_name, "-%d$") then
+            local pure_tech_name = string.gsub(tech_name, "-%d$", "")
+            local tech_number = string.gsub(tech_name, "^.+-", "")
+            temp_tech_localisation = {"", {"technology-name."..pure_tech_name}, " "..tech_number}
+            log(serpent.line(temp_tech_localisation))
+        end
         for _, effect in pairs(tech.effects) do
-            if tech_name then
-                tech_name = string.gsub(tech_name, "%d$", "")
-            end
-            local tech_localized = tech.localised_name or ("technology-name."..tech_name)
-            local order = tech.order
+            local tech_localised = tech.localised_name or temp_tech_localisation or  {"technology-name."..tech_name}
             if effect.type == "unlock-recipe" then
                 local recipe = data.raw.recipe[effect.recipe]
-                add_custom_tooltip_field(recipe, {"factoriopedia.recipe-unlock"}, {"", tech_localized}, false, order)
+                log(recipe.name..": "..serpent.line(tech_localised))
+                local order = recipe.custom_tool_tip_order or 40
+                add_custom_tooltip_field(recipe, {"factoriopedia.recipe-unlock"}, tech_localised, false, order)
                 if tech.archipelago_controlled then
-                    add_custom_tooltip_field(recipe, {"factoriopedia.ap-unlock"}, tech.research_trigger.trigger_description, false, order)
+                    add_custom_tooltip_field(recipe, {"factoriopedia.ap-unlock"}, tech.research_trigger.trigger_description, false, order+1)
                 end
+                recipe.custom_tool_tip_order = order + 2
             end
         end
     end
