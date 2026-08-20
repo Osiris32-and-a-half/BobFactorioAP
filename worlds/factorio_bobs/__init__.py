@@ -5,24 +5,23 @@ import logging
 import random
 import typing
 
-from .FactorioModpack import FactorioModpack
-from .APModpackManager import get_items, get_locations, items_to_id, get_item_groups, get_location_groups, modpacks
 import Utils
 from BaseClasses import Region, Location, Item, Tutorial, ItemClassification, CollectionState
 from NetUtils import JSONMessagePart
-from Options import OptionError
+from rule_builder.rules import Has, And, CanReachLocation
 from worlds.AutoWorld import World, WebWorld
 from worlds.LauncherComponents import Component, components, Type, launch as launch_component
-from worlds.generic import Rules
-from .Mod import generate_mod
+from .APModpackManager import get_items, get_locations, items_to_id, get_item_groups, get_location_groups, modpacks
+from .FactorioModpack import FactorioModpack
 from .FactorioOptions import (FactorioOptions, Silo, Satellite, TechTreeInformation, Goal,
-                              TechLayerObscurity, TechDepthObscurity, TechCostDistribution, option_groups)
-from .FactorioRules import InternalItemRule, TechRule, AndRule, OrRule, process_yaml_rule, Rule
-from .RandomGameItems import RandomGameItems
-from .RecipeEngine import GameRecipe, GameItem, DefinitionSource, TechCatalyst, Category, OneItemCatalyst
-from .Shapes import get_shapes
+                              TechCostDistribution, option_groups, TechLayerObscurity, TechDepthObscurity)
+from .FactorioRules import process_yaml_rule, Rule, NodeRule, AnyLogic
 from .FactorioSettings import FactorioSettings
+from .Mod import generate_mod
+from .RecipeEngine.NodeComponents.LogicComponents import MultiLogicComponent
+from .Shapes import get_shapes
 from .Technologies import Technology
+from ..factorio.Technologies import CustomTechnology
 
 modpacks: dict[str, FactorioModpack]
 
@@ -80,13 +79,13 @@ class FactorioBobs(World):
     if Utils.version_tuple < required_client_version:
         raise Exception(f"Update Archipelago to use this world ({game}).")
     tech_tree_layout_prerequisites: typing.Dict[FactorioScienceLocation, typing.Set[FactorioScienceLocation]]
+    skip_silo: bool = False
     origin_region_name = "Nauvis"
     science_locations: typing.List[FactorioScienceLocation]
     removed_technologies: typing.Set[str]
     settings: typing.ClassVar[FactorioSettings]
     trap_names: tuple[str] = ("Evolution", "Attack", "Teleport", "Grenade", "Cluster Grenade", "Artillery",
-                              "Atomic Rocket", "Atomic Cliff Remover", "Inventory Spill",
-                              "Peek a Tech", "Tech Reset", "Reset Map Info", "Energy Spiral")
+                              "Atomic Rocket", "Atomic Cliff Remover", "Inventory Spill")
     want_progressives: dict[str, bool] = collections.defaultdict(lambda: False)
 
     seeded_random_seed: int
@@ -96,10 +95,9 @@ class FactorioBobs(World):
 
     def __init__(self, world, player: int):
         super(FactorioBobs, self).__init__(world, player)
-        self.additional_logic: dict[int, AndRule] = {}
         self.progression_technologies: set[Technology] = set()
-        self.custom_recipes : typing.Dict[str, GameRecipe] = {}
-        self.custom_products: dict[str, GameItem] = {}
+        # self.custom_recipes : typing.Dict[str, GameRecipe] = {}
+        # self.custom_products: dict[str, GameItem] = {}
         self.science_locations = []
         self.tech_tree_layout_prerequisites = {}
         self.modpack: FactorioModpack | None = None
@@ -108,6 +106,8 @@ class FactorioBobs(World):
         self.techs_to_hint = {}
 
         self.logger = logging.getLogger(f"{self.game}:{self.player}")
+
+        self.custom_technologies: dict[str, CustomTechnology] = {}
 
         self.set_seeded_random_seed(self.random.getrandbits(64))
 
@@ -145,6 +145,13 @@ class FactorioBobs(World):
         self.modpack = modpacks[modpack_name]
         self.modpack.init_pack_check()
 
+        state = self.multiworld.state
+        state.node_logic[self.player] = {node: AnyLogic(node, self.player, state)
+                                         for node in self.modpack.game_item_manager.recipe_engine.nodes.values()}
+        character_logic: AnyLogic = state.node_logic[self.player][self.modpack.game_item_manager.character_node]
+        character_logic.manual_path = True
+        character_logic.propagate_update()
+
         self.removed_technologies = self.modpack.removed_technologies.copy()
         self.options.number_of_science_packs.value = min(len(self.modpack.ordered_science_packs), self.options.number_of_science_packs.value)
 
@@ -152,6 +159,7 @@ class FactorioBobs(World):
         if self.options.max_tech_cost < self.options.min_tech_cost:
             self.options.min_tech_cost.value, self.options.max_tech_cost.value = \
                 self.options.max_tech_cost.value, self.options.min_tech_cost.value
+        self.skip_silo = self.options.silo.value == Silo.option_spawn
         self.want_progressives = collections.defaultdict(
             lambda: self.options.progressive.want_progressives(self.random))
 
@@ -162,50 +170,31 @@ class FactorioBobs(World):
             self.logger.error(f"SLOT_DATA: {slot_data}")
             if FactorioBobs.SLOT_RANDOM_SEED_KEY in slot_data:
                 self.set_seeded_random_seed(slot_data[FactorioBobs.SLOT_RANDOM_SEED_KEY])
-            slot_recipes = slot_data[FactorioBobs.SLOT_RANDOM_RECIPES_KEY]
-            for product_name, ingredients_name in slot_recipes.items():
-                new_ingredients = {}
-                liquids_used = 0
-                for ingredient_name in ingredients_name:
-                    ingredient = self.modpack.recipe_engine.get_game_item(ingredient_name)
-                    if ingredient.is_fluid:
-                        liquids_used += 1
-                    new_ingredients[ingredient] = 1
-
-                custom_products = {}
-                if product_name not in self.custom_products:
-                    self.custom_products[product_name] = GameItem(self.modpack.recipe_engine, product_name,
-                                                                  DefinitionSource.WORLD)
-                custom_products[self.custom_products[product_name]] = 1
-                self.custom_recipes[product_name] = GameRecipe(self.modpack.recipe_engine, product_name,
-                                                               DefinitionSource.WORLD, self.get_category(new_ingredients),
-                                                               new_ingredients, custom_products,
-                                                               1)
-                self.custom_products[product_name].crafted_by.add(self.custom_recipes[product_name])
-                # print(f"{[x for x in self.custom_recipes[product_name].products]}: {[x for x in self.custom_recipes[product_name].ingredients]}")
+            # slot_recipes = slot_data[FactorioBobs.SLOT_RANDOM_RECIPES_KEY]
+            # for product_name, ingredients_name in slot_recipes.items():
+            #     new_ingredients = {}
+            #     liquids_used = 0
+            #     for ingredient_name in ingredients_name:
+            #         ingredient = self.modpack.recipe_engine.get_game_item(ingredient_name)
+            #         if ingredient.is_fluid:
+            #             liquids_used += 1
+            #         new_ingredients[ingredient] = 1
+            #
+            #     custom_products = {}
+            #     if product_name not in self.custom_products:
+            #         self.custom_products[product_name] = GameItem(self.modpack.recipe_engine, product_name,
+            #                                                       DefinitionSource.WORLD)
+            #     custom_products[self.custom_products[product_name]] = 1
+            #     self.custom_recipes[product_name] = GameRecipe(self.modpack.recipe_engine, product_name,
+            #                                                    DefinitionSource.WORLD, self.get_category(new_ingredients),
+            #                                                    new_ingredients, custom_products,
+            #                                                    1)
+            #     self.custom_products[product_name].crafted_by.add(self.custom_recipes[product_name])
+            #     # print(f"{[x for x in self.custom_recipes[product_name].products]}: {[x for x in self.custom_recipes[product_name].ingredients]}")
             self.options.additional_logic.value = self.options.additional_logic.option_none
             slot_options = slot_data[FactorioBobs.SLOT_OPTIONS_KEY]
             self.options.tech_cost_mix.value = slot_options[self.options.tech_cost_mix.display_name]
             self.options.number_of_science_packs.value = slot_options[self.options.number_of_science_packs.display_name]
-
-        if self.options.additional_logic.value == self.options.additional_logic.option_none:
-            self.additional_logic = {}
-        elif self.options.additional_logic.value == self.options.additional_logic.option_default:
-            self.additional_logic = {complexity:
-                                        process_yaml_rule(yaml_rule, self.modpack)
-                                     for complexity, yaml_rule in self.modpack.default_options["additional_logic"].items()}
-        elif self.options.additional_logic.value == self.options.additional_logic.option_custom:
-            self.additional_logic = {complexity:
-                                        process_yaml_rule(yaml_rule, self.modpack)
-                                     for complexity, yaml_rule in self.options.custom_additional_logic.value.items()}
-        else:
-            raise OptionError("additional_logic is invalid type")
-
-
-        for complexity, rule in self.additional_logic.items():
-            if complexity <= self.options.number_of_science_packs.value:
-                for tech in rule.needed_items():
-                    self.progression_technologies.add(self.modpack.technology_table[tech])
 
         # handle marking progressive techs as advancement
         prog_add = set()
@@ -218,9 +207,7 @@ class FactorioBobs(World):
         player = self.player
         nauvis = Region(self.origin_region_name, player, self.multiworld)
 
-        location_count = len(self.modpack.base_technology_table) - len(self.modpack.removed_technologies)
-        if self.options.silo.value == Silo.option_spawn:
-            location_count -= 1
+        location_count = len(self.modpack.base_technology_table) - len(self.modpack.removed_technologies) - self.skip_silo
 
         for name in self.trap_names:
             name = name.replace(" ", "_").lower()+"_traps"
@@ -286,7 +273,6 @@ class FactorioBobs(World):
 
     def create_items(self) -> None:
         self.custom_technologies = self.set_custom_technologies()
-
         for trap_name in self.trap_names:
             self.multiworld.itempool.extend(self.create_item(f"{trap_name} Trap") for _ in
                                             range(getattr(self.options,
@@ -295,14 +281,12 @@ class FactorioBobs(World):
         cost_sorted_locations = sorted(self.science_locations, key=lambda location: (location.complexity, location.rel_cost))
         special_index = self.modpack.forced_locations
         loc: FactorioScienceLocation
-        if self.options.tech_tree_information == TechTreeInformation.option_full or self.options.tech_tree_information == TechTreeInformation.option_full_only_hint_advancement:
+        if self.options.tech_tree_information == TechTreeInformation.option_full:
             # mark all locations as pre-hinted
             for loc in self.science_locations:
                 loc.revealed = True
-        if self.options.silo.value == Silo.option_spawn:
+        if self.skip_silo:
             self.removed_technologies |= {"rocket-silo"}
-            silo_item = self.create_item("rocket-silo")
-            self.push_precollected(silo_item)
         for tech_name in self.modpack.base_technology_table.keys():
             if tech_name not in self.removed_technologies:
                 progressive_item_name = self.modpack.tech_to_progressive_lookup.get(tech_name, tech_name)
@@ -329,6 +313,8 @@ class FactorioBobs(World):
 
     def set_rules(self):
         player = self.player
+        game_item_manager = self.modpack.game_item_manager
+
         shapes = get_shapes(self)
 
         science_packs = self.modpack.ordered_science_packs[:self.options.number_of_science_packs]
@@ -336,238 +322,241 @@ class FactorioBobs(World):
             if science_pack == "automation-science-pack":
                 continue
             location = self.get_location(f"Automate {science_pack}")
-            optimized_rule = self.get_science_pack_rule(complexity)
-            Rules.set_rule(location, lambda state, location_rule = optimized_rule: location_rule.eval(self, state))
+
+            science_pack_node = game_item_manager.get_item_node(science_pack)
+
+            rule = NodeRule(science_pack_node)
+
+            if self.options.additional_logic.value == self.options.additional_logic.option_default:
+                if complexity in self.modpack.default_options["additional_logic"]:
+                    additional_logic_rule = process_yaml_rule(self.modpack.default_options["additional_logic"][complexity], self.modpack)
+                    rule &= additional_logic_rule
+            elif self.options.additional_logic.value == self.options.additional_logic.option_custom:
+                if complexity in self.options.custom_additional_logic.value.keys():
+                    additional_logic_rule = process_yaml_rule(self.options.custom_additional_logic[str(complexity)], self.modpack)
+                    rule &= additional_logic_rule
+
+            self.set_rule(location, rule)
 
         for location in self.science_locations:
-            Rules.set_rule(location, lambda state: True)
-            for ingredient_name in location.ingredients:
-                Rules.add_rule(location, lambda state, lambda_ingredient=ingredient_name: state.has(f"Automated {lambda_ingredient}", player))
-            # Rules.set_rule(location, lambda state, ingredients=frozenset(location.ingredients):
-            #     all(state.has(f"Automated {ingredient}", player) for ingredient in ingredients))
+            rule = And(*(Has(f"Automated {ingredient_name}") for ingredient_name in location.ingredients))
             prerequisites = shapes.get(location)
             if prerequisites:
-                Rules.add_rule(location, lambda state, locations=frozenset(prerequisites):
-                    all(state.can_reach(loc) for loc in locations))
+                for prerequisite in prerequisites:
+                    rule &= CanReachLocation(prerequisite.name)
 
-        victory_tech: set[Technology] = set()
+            self.set_rule(location, rule)
+            # Rules.set_rule(location, lambda state, ingredients=frozenset(location.ingredients):
+            #     all(state.has(f"Automated {ingredient}", player) for ingredient in ingredients))
+
+        rocket_part_node = game_item_manager.get_item_node("rocket-part")
+        victory_rule: Rule = NodeRule(rocket_part_node)
         if self.options.silo != Silo.option_spawn:
-            victory_tech |= self.get_item_tech_req("rocket-silo")
-            victory_tech |= self.get_item_tech_req("cargo-landing-pad")
-        victory_tech |= self.get_item_tech_req("rocket-part")
+            rocket_silo_node = game_item_manager.get_item_node("rocket-silo")
+            victory_rule &= NodeRule(rocket_silo_node)
+
+            cargo_landing_pad_node = game_item_manager.get_item_node("cargo-landing-pad")
+            victory_rule &= NodeRule(cargo_landing_pad_node)
+
         if self.options.goal == Goal.option_satellite:
-            victory_tech |= self.get_item_tech_req("satellite")
-        victory_tech_names = set(tech.name for tech in victory_tech)
-        self.get_location("Rocket Launch").access_rule = lambda state: all(state.has(technology, player)
-                                                                           for technology in
-                                                                           victory_tech_names)
-        self.multiworld.completion_condition[player] = lambda state: state.has("Victory", player)
+            satellite_node = game_item_manager.get_item_node("satellite")
+            victory_rule &= NodeRule(satellite_node)
+        self.set_completion_rule(victory_rule)
 
-    def get_science_pack_rule(self, complexity: int) -> Rule:
-        science_pack = self.modpack.ordered_science_packs[complexity-1]
-        # science_pack_item: GameItem = self.get_internal_item(science_pack)
-        # if complexity in self.additional_logic:
-        #     rule = AndRule(InternalItemRule(science_pack_item), self.additional_logic[complexity])
-        # else:
-        #     rule = InternalItemRule(science_pack_item)
-        req_tech = self.get_item_tech_req(science_pack)
-        if complexity in self.additional_logic:
-            rule = AndRule(*(TechRule(tech) for tech in req_tech), self.additional_logic[complexity])
-        else:
-            rule = AndRule(*(TechRule(tech) for tech in req_tech))
-        return rule.optimize()
+        # all_state = self.multiworld.get_all_state()
+        # print()
 
-    def get_internal_item(self, name: str) -> GameItem:
-        return self.custom_products[name] if name in self.custom_products \
-            else self.modpack.recipe_engine.get_game_item(name)
+    def generate_basic(self):
+        start_location_hints: typing.Set[str] = self.options.start_location_hints.value
 
-    def get_item_tech_req(self, item_name: str) -> set[Technology]: # todo this is temp replace this with bootstrap
-        if item_name not in self.custom_recipes:
-            item = self.modpack.recipe_engine.get_game_item(item_name)
-            if not item.has_calculated_raw:
-                raise RuntimeError(f"Item {item_name} has no calculated raw data, run GenPrecalc on pack")
-            return item.get_req_techs()
-        recipe = self.custom_recipes[item_name]
-        req = set()
-        for item in recipe.ingredients:
-            if not item.has_calculated_raw:
-                raise RuntimeError(f"Item {item_name} has no calculated raw data, run GenPrecalc on pack")
-            req |= item.get_req_techs()
+        for loc in self.science_locations:
+            # show start_location_hints ingame
+            if loc.name in start_location_hints:
+                loc.revealed = True
+            # make spoiler match mod info
+            elif loc.revealed:
+                start_location_hints.add(loc.name)
 
-        for catalyst in recipe.technologies:
-            req.add(catalyst.tech)
+    # def collect_item(self, state, item, remove=False):
+    #     # if item.advancement and item.name in self.modpack.progressive_technology_table:
+    #     #     prog_table = self.modpack.progressive_technology_table[item.name].progressive
+    #     #     if remove:
+    #     #         for item_name in reversed(prog_table):
+    #     #             if state.has(item_name, item.player):
+    #     #                 return item_name
+    #     #     else:
+    #     #         for item_name in prog_table:
+    #     #             if not state.has(item_name, item.player):
+    #     #                 return item_name
+    #     return super(FactorioBobs, self).collect_item(state, item, remove)
 
-        ordered_machines = sorted(recipe.category.machines, key=lambda m: m.score)
-        for machine in ordered_machines:
-            if machine.is_valid:
-                req |= machine.get_req_techs()
-                break
+    def collect(self, state: CollectionState, item: Item) -> bool:
+        change = super().collect(state, item)
+        item_name = item.name
 
-        for catalyst in recipe.needed_items:
-            item = catalyst.item
-            if item.is_valid:
-                req |= item.get_req_techs()
-                break
-            else:
-                raise RuntimeError(f"Item {item_name} is invalid")
-        return req
+        if item_name in self.modpack.progressive_technology_table:
+            stage = state.count(item.name, self.player)
+            item_name = self.modpack.progressive_technology_table[item_name].progressive[stage-1]
 
-    #def generate_basic(self):
+        if change and item_name in self.modpack.game_item_manager.technology_nodes:
+            node = self.modpack.game_item_manager.technology_nodes[item_name]
+            state.node_logic[self.player][node].force_enable()
+        return change
 
-    def collect_item(self, state, item, remove=False):
-        if item.advancement and item.name in self.modpack.progressive_technology_table:
-            prog_table = self.modpack.progressive_technology_table[item.name].progressive
-            if remove:
-                for item_name in reversed(prog_table):
-                    if state.has(item_name, item.player):
-                        return item_name
-            else:
-                for item_name in prog_table:
-                    if not state.has(item_name, item.player):
-                        return item_name
+    def remove(self, state: CollectionState, item: Item) -> bool:
+        change = super().remove(state, item)
+        item_name = item.name
 
-        return super(FactorioBobs, self).collect_item(state, item, remove)
+        if item_name in self.modpack.progressive_technology_table:
+            stage = state.count(item.name, self.player)
+            item_name = self.modpack.progressive_technology_table[item_name].progressive[stage]
+
+        if change and item_name in self.modpack.game_item_manager.technology_nodes:
+            node = self.modpack.game_item_manager.technology_nodes[item.name]
+            state.node_logic[self.player][node].disable()
+        return change
 
     @classmethod
     def stage_write_spoiler(cls, world, spoiler_handle):
-        factorio_players = world.get_game_players(cls.game)
-        spoiler_handle.write('\n\nFactorioBobs Recipes:\n')
-        for player in factorio_players:
-            name = world.get_player_name(player)
-            for recipe in world.worlds[player].custom_recipes.values():
-                spoiler_handle.write(f"\n{recipe.name} ({name}): {recipe.ingredients} -> {recipe.products}")
+        pass
+        # factorio_players = world.get_game_players(cls.game)
+        # spoiler_handle.write('\n\nFactorioBobs Recipes:\n')
+        # for player in factorio_players:
+        #     name = world.get_player_name(player)
+        #     for recipe in world.worlds[player].custom_recipes.values():
+        #         spoiler_handle.write(f"\n{recipe.name} ({name}): {recipe.ingredients} -> {recipe.products}")
 
-    @staticmethod
-    def get_category(ingredients: typing.Iterable[GameItem], preferred="crafting") -> str: # todo extract number of fluid input for categories
-        num_liquids = sum(1 for ingredient in ingredients if ingredient.is_fluid)
-        categories = {0: preferred,
-                      1: "crafting-with-fluid",
-                      2: "chemistry"}
-        return categories[num_liquids]
+    # @staticmethod
+    # def get_category(ingredients: typing.Iterable[GameItem], preferred="crafting") -> str:
+    #     num_liquids = sum(1 for ingredient in ingredients if ingredient.is_fluid)
+    #     categories = {0: preferred,
+    #                   1: "crafting-with-fluid",
+    #                   2: "chemistry"}
+    #     return categories[num_liquids]
 
-    def make_custom_recipe(self, name:str, products: dict[GameItem, int], ingredients_num: int, energy: int,
-                           pool: RandomGameItems, pool_index: int, allow_liquids: int = 2, category = "crafting")-> GameRecipe:
-        # assert len(pool) >= ingredients_num, f"Can't pick {ingredients_num} many items from pool {pool}."
-        new_ingredients = {}
-        liquids_used = 0
-        bad_items: list[GameItem] = []
-        if self.options.no_earlier_pools.value:
-            get_item = lambda: pool.pop_item_from_pool(pool_index)
-        else:
-            get_item = lambda: pool.pop_item_from_pool(0, pool_index)
+    # def make_custom_recipe(self, name:str, products: dict[GameItem, int], ingredients_num: int, energy: int,
+    #                        pool: RandomGameItems, pool_index: int, allow_liquids: int = 2, category = "crafting")-> GameRecipe:
+    #     # assert len(pool) >= ingredients_num, f"Can't pick {ingredients_num} many items from pool {pool}."
+    #     new_ingredients = {}
+    #     liquids_used = 0
+    #     bad_items: list[GameItem] = []
+    #     if self.options.no_earlier_pools.value:
+    #         get_item = lambda: pool.pop_item_from_pool(pool_index)
+    #     else:
+    #         get_item = lambda: pool.pop_item_from_pool(0, pool_index)
+    #
+    #     for _ in range(ingredients_num):
+    #         new_ingredient = get_item()
+    #         while liquids_used == allow_liquids and new_ingredient.is_fluid:
+    #             # liquids already at max for current recipe.
+    #             # Return the liquid to the pool and get a new lambda_ingredient.
+    #             bad_items.append(new_ingredient)
+    #             new_ingredient: GameItem = get_item()
+    #         if new_ingredient.is_fluid:
+    #             liquids_used += 1
+    #         new_ingredients[new_ingredient] = 1
+    #
+    #     custom_products = {}
+    #     for product, amount in products.items():
+    #         if product.name not in self.custom_products:
+    #             self.custom_products[product.name] = GameItem(self.modpack.game_item_manager, product.name,
+    #                                                           DefinitionSource.WORLD, product.is_fluid)
+    #         custom_products[self.custom_products[product.name]] = amount
+    #     recipe = GameRecipe(self.modpack.game_item_manager, name, DefinitionSource.WORLD,
+    #                         self.get_category(new_ingredients, category), new_ingredients,
+    #                         custom_products, energy)
+    #     return recipe
 
-        for _ in range(ingredients_num):
-            new_ingredient = get_item()
-            while liquids_used == allow_liquids and new_ingredient.is_fluid:
-                # liquids already at max for current recipe.
-                # Return the liquid to the pool and get a new lambda_ingredient.
-                bad_items.append(new_ingredient)
-                new_ingredient: GameItem = get_item()
-            if new_ingredient.is_fluid:
-                liquids_used += 1
-            new_ingredients[new_ingredient] = 1
+    # def make_balanced_recipe(self, original: GameRecipe, pool: RandomGameItems, pool_index = -1, factor: float = 1,
+    #                          allow_liquids: int = 2, ingredients_offset: int = 0) -> GameRecipe:
+    #     """Generate a recipe from pool with time and cost similar to original * factor"""
+    #     new_ingredients = {}
+    #     target_energy = int(sum(ingredient.score * count for ingredient, count in original.ingredients.items()) * factor)
+    #     target_num_ingredients = len(original.ingredients) + ingredients_offset
+    #     remaining_energy = target_energy
+    #     remaining_num_ingredients = target_num_ingredients
+    #     bad_items: list[GameItem] = []
+    #     liquids_used = 0
+    #     if self.options.no_earlier_pools.value:
+    #         get_item = lambda: pool.pop_item_from_pool(pool_index)
+    #     else:
+    #         get_item = lambda: pool.pop_item_from_pool(0, pool_index)
+    #
+    #     # fill all but one slot with random ingredients, last with a good match
+    #     while remaining_num_ingredients > 0:
+    #         ingredient = get_item()
+    #         if not ingredient.is_valid_pool:
+    #             continue
+    #         assert ingredient.has_calculated_raw, f"{ingredient}: Calculated raw not available"
+    #         if liquids_used == allow_liquids and ingredient.is_fluid:
+    #             continue  # can't use this ingredient as we already have maximum liquid in our recipe.
+    #         ingredient_energy = ingredient.score
+    #         if remaining_num_ingredients == 1:
+    #             max_energy = 1.1 * remaining_energy
+    #             min_energy = 0.9 * remaining_energy
+    #         else:
+    #             max_energy = remaining_energy * 0.75
+    #             min_energy = (remaining_energy - max_energy) / remaining_num_ingredients
+    #         min_num_energy = min_energy / ingredient_energy
+    #         max_num_energy = max_energy / ingredient_energy
+    #         min_num = int(max(1, min_num_energy))
+    #         max_num = int(min(1000, max_num_energy))
+    #         if min_num > max_num:
+    #             bad_items.append(ingredient)
+    #             continue  # can't use that ingredient
+    #         num = self.random.randint(min_num, max_num)
+    #         new_ingredients[ingredient] = num
+    #         remaining_energy -= num * ingredient_energy
+    #         remaining_num_ingredients -= 1
+    #         if ingredient.is_fluid:
+    #             liquids_used += 1
+    #
+    #     # fill failed slots with whatever we got
+    #     pool.return_items(bad_items)
+    #     bad_items = []
+    #     while remaining_num_ingredients > 0 and pool:
+    #         ingredient: GameItem = get_item()
+    #         if not ingredient.is_valid_pool:
+    #             continue
+    #         if not ingredient.has_calculated_raw:
+    #             raise RuntimeError(f"{ingredient}: Calculated raw not available")
+    #         if liquids_used == allow_liquids and ingredient.is_fluid:
+    #             bad_items.append(ingredient)
+    #             continue  # can't use this lambda_ingredient as we already have maximum liquid in our recipe.
+    #
+    #         ingredient_energy = ingredient.score
+    #         num_energy = remaining_energy / ingredient_energy / remaining_num_ingredients
+    #         num = int(num_energy)
+    #         if num < 1:
+    #             bad_items.append(ingredient)
+    #             continue
+    #
+    #         new_ingredients[ingredient] = num
+    #         remaining_energy -= num * ingredient_energy
+    #         remaining_num_ingredients -= 1
+    #         if ingredient.is_fluid:
+    #             liquids_used += 1
+    #
+    #
+    #     if remaining_num_ingredients > 1:
+    #         self.logger.warning("could not randomize recipe")
+    #
+    #     pool.return_items(bad_items)
+    #
+    #     custom_products = {}
+    #     for product, amount in original.products.items():
+    #         if product.name not in self.custom_products:
+    #             self.custom_products[product.name] = GameItem(self.modpack.game_item_manager, product.name,
+    #                                                           DefinitionSource.WORLD, product.is_fluid)
+    #         custom_products[self.custom_products[product.name]] = amount
+    #
+    #     recipe = GameRecipe(self.modpack.game_item_manager, original.name, DefinitionSource.WORLD,
+    #                         self.get_category(new_ingredients, original.category.name), new_ingredients,
+    #                         custom_products, original.energy)
+    #     recipe.technologies = original.technologies
+    #     return recipe
 
-        custom_products = {}
-        for product, amount in products.items():
-            if product.name not in self.custom_products:
-                self.custom_products[product.name] = GameItem(self.modpack.recipe_engine, product.name,
-                                                              DefinitionSource.WORLD, product.is_fluid)
-            custom_products[self.custom_products[product.name]] = amount
-        recipe = GameRecipe(self.modpack.recipe_engine, name, DefinitionSource.WORLD,
-                            self.get_category(new_ingredients, category), new_ingredients,
-                      custom_products, energy)
-        return recipe
-
-    def make_balanced_recipe(self, original: GameRecipe, pool: RandomGameItems, pool_index = -1, factor: float = 1,
-                             allow_liquids: int = 2, ingredients_offset: int = 0) -> GameRecipe:
-        """Generate a recipe from pool with time and cost similar to original * factor"""
-        new_ingredients = {}
-        target_energy = int(sum(ingredient.score * count for ingredient, count in original.ingredients.items()) * factor)
-        target_num_ingredients = len(original.ingredients) + ingredients_offset
-        remaining_energy = target_energy
-        remaining_num_ingredients = target_num_ingredients
-        bad_items: list[GameItem] = []
-        liquids_used = 0
-        if self.options.no_earlier_pools.value:
-            get_item = lambda: pool.pop_item_from_pool(pool_index)
-        else:
-            get_item = lambda: pool.pop_item_from_pool(0, pool_index)
-
-        # fill all but one slot with random ingredients, last with a good match
-        while remaining_num_ingredients > 0:
-            ingredient = get_item()
-            if not ingredient.is_valid_pool:
-                continue
-            assert ingredient.has_calculated_raw, f"{ingredient}: Calculated raw not available"
-            if liquids_used == allow_liquids and ingredient.is_fluid:
-                continue  # can't use this ingredient as we already have maximum liquid in our recipe.
-            ingredient_energy = ingredient.score
-            if remaining_num_ingredients == 1:
-                max_energy = 1.1 * remaining_energy
-                min_energy = 0.9 * remaining_energy
-            else:
-                max_energy = remaining_energy * 0.75
-                min_energy = (remaining_energy - max_energy) / remaining_num_ingredients
-            min_num_energy = min_energy / ingredient_energy
-            max_num_energy = max_energy / ingredient_energy
-            min_num = int(max(1, min_num_energy))
-            max_num = int(min(1000, max_num_energy))
-            if min_num > max_num:
-                bad_items.append(ingredient)
-                continue  # can't use that ingredient
-            num = self.random.randint(min_num, max_num)
-            new_ingredients[ingredient] = num
-            remaining_energy -= num * ingredient_energy
-            remaining_num_ingredients -= 1
-            if ingredient.is_fluid:
-                liquids_used += 1
-
-        # fill failed slots with whatever we got
-        pool.return_items(bad_items)
-        bad_items = []
-        while remaining_num_ingredients > 0 and pool:
-            ingredient: GameItem = get_item()
-            if not ingredient.is_valid_pool:
-                continue
-            if not ingredient.has_calculated_raw:
-                raise RuntimeError(f"{ingredient}: Calculated raw not available")
-            if liquids_used == allow_liquids and ingredient.is_fluid:
-                bad_items.append(ingredient)
-                continue  # can't use this lambda_ingredient as we already have maximum liquid in our recipe.
-
-            ingredient_energy = ingredient.score
-            num_energy = remaining_energy / ingredient_energy / remaining_num_ingredients
-            num = int(num_energy)
-            if num < 1:
-                bad_items.append(ingredient)
-                continue
-
-            new_ingredients[ingredient] = num
-            remaining_energy -= num * ingredient_energy
-            remaining_num_ingredients -= 1
-            if ingredient.is_fluid:
-                liquids_used += 1
-
-
-        if remaining_num_ingredients > 1:
-            self.logger.warning("could not randomize recipe")
-
-        pool.return_items(bad_items)
-
-        custom_products = {}
-        for product, amount in original.products.items():
-            if product.name not in self.custom_products:
-                self.custom_products[product.name] = GameItem(self.modpack.recipe_engine, product.name,
-                                                              DefinitionSource.WORLD, product.is_fluid)
-            custom_products[self.custom_products[product.name]] = amount
-
-        recipe = GameRecipe(self.modpack.recipe_engine, original.name, DefinitionSource.WORLD,
-                            self.get_category(new_ingredients, original.category.name), new_ingredients,
-                      custom_products, original.energy)
-        recipe.technologies = original.technologies
-        return recipe
-
-    def set_custom_technologies(self):
+    def set_custom_technologies(self) -> dict[str, CustomTechnology]:
         custom_technologies = {}
         allowed_packs = self.get_allowed_packs()
         for technology_name, technology in self.modpack.base_technology_table.items():
@@ -577,66 +566,67 @@ class FactorioBobs(World):
     def set_custom_recipes(self):
         # for name, item in all_ingredients.items():
         #     print(f"{name}: {item.get_raw_ingredients()}")
-        ingredients_offset = self.options.recipe_ingredients_offset
 
-        pools = RandomGameItems(self)
+        # ingredients_offset = self.options.recipe_ingredients_offset
+        #
+        # pools = RandomGameItems(self)
+        #
+        # for index, pack in enumerate(self.modpack.ordered_science_packs[:self.options.number_of_science_packs.value]):
+        #     if self.options.recipe_ingredients or not self.modpack.game_item_manager.get_game_item(pack).best_recipes:
+        #         pack_item = self.modpack.game_item_manager.get_game_item(pack)
+        #         return_amount = index//2 + 1
+        #         new_recipe = self.make_custom_recipe(pack, {pack_item: return_amount},
+        #                                              index//2 + 2 + ingredients_offset.value,
+        #                                              return_amount*5, pools, index)
+        #         new_recipe.productivity = True
+        #         if pack in self.modpack.game_item_manager.recipes:
+        #             new_recipe.technologies = self.modpack.game_item_manager.recipes[pack].technologies
+        #         self.custom_recipes[pack] = new_recipe
+        #
+        # original_rocket_part = self.modpack.game_item_manager.recipes["rocket-part"]
+        # custom_rocket_part = GameItem(self.modpack.game_item_manager, "rocket-part", DefinitionSource.WORLD, False)
+        # self.custom_products[custom_rocket_part.name] = custom_rocket_part
+        # self.custom_recipes["rocket-part"] = GameRecipe(self.modpack.game_item_manager, "rocket-part", DefinitionSource.WORLD,
+        #                                                 original_rocket_part.category,
+        #                                                 {pools.pop_item_from_pool(-1): 10 for _ in range(3 + ingredients_offset)},
+        #                                                 {custom_rocket_part: 1},
+        #                                                 original_rocket_part.energy)
+        # self.custom_recipes["rocket-part"].productivity = True
+        #
+        # if self.options.silo.value == Silo.option_randomize_recipe:
+        #     old_recipe = self.modpack.game_item_manager.recipes["rocket-silo"]
+        #     new_recipe = self.make_balanced_recipe(
+        #         old_recipe, pools, -1,
+        #         factor=self.options.number_of_science_packs.value / len(self.modpack.ordered_science_packs),
+        #         ingredients_offset=ingredients_offset.value)
+        #     self.custom_recipes["rocket-silo"] = new_recipe
+        #
+        # if self.options.satellite.value == Satellite.option_randomize_recipe:
+        #     old_recipe = self.modpack.game_item_manager.recipes["satellite"]
+        #     new_recipe = self.make_balanced_recipe(
+        #         old_recipe, pools, -1,
+        #         factor=self.options.number_of_science_packs.value / len(self.modpack.ordered_science_packs),
+        #         ingredients_offset=ingredients_offset.value)
+        #     self.custom_recipes["satellite"] = new_recipe
+        #
+        # bridge = GameItem(self.modpack.game_item_manager, "ap-energy-bridge", DefinitionSource.WORLD, False)
+        # self.custom_products["ap-energy-bridge"] = bridge
+        # new_recipe = self.make_custom_recipe(bridge.name, {bridge: 1}, 6+ingredients_offset.value, 10,
+        #     pools, 0)
+        # for ingredient_name in new_recipe.ingredients:
+        #     new_recipe.ingredients[ingredient_name] = self.random.randint(50, 500)
+        # self.custom_recipes[bridge.name] = new_recipe
 
-        for index, pack in enumerate(self.modpack.ordered_science_packs[:self.options.number_of_science_packs.value]):
-            if self.options.recipe_ingredients or not self.modpack.recipe_engine.get_game_item(pack).best_recipes:
-                pack_item = self.modpack.recipe_engine.get_game_item(pack)
-                return_amount = index//2 + 1
-                new_recipe = self.make_custom_recipe(pack, {pack_item: return_amount},
-                                                     index//2 + 2 + ingredients_offset.value,
-                                                     return_amount*5, pools, index)
-                new_recipe.productivity = True
-                if pack in self.modpack.recipe_engine.recipes:
-                    new_recipe.technologies = self.modpack.recipe_engine.recipes[pack].technologies
-                self.custom_recipes[pack] = new_recipe
-
-        original_rocket_part = self.modpack.recipe_engine.recipes["rocket-part"]
-        custom_rocket_part = GameItem(self.modpack.recipe_engine, "rocket-part", DefinitionSource.WORLD, False)
-        self.custom_products[custom_rocket_part.name] = custom_rocket_part
-        self.custom_recipes["rocket-part"] = GameRecipe(self.modpack.recipe_engine, "rocket-part", DefinitionSource.WORLD,
-                                                        original_rocket_part.category,
-                                                     {pools.pop_item_from_pool(-1): 10 for _ in range(3 + ingredients_offset)},
-                                                     {custom_rocket_part: 1},
-                                                     original_rocket_part.energy)
-        self.custom_recipes["rocket-part"].productivity = True
-
-        if self.options.silo.value == Silo.option_randomize_recipe:
-            old_recipe = self.modpack.recipe_engine.recipes["rocket-silo"]
-            new_recipe = self.make_balanced_recipe(
-                old_recipe, pools, -1,
-                factor=self.options.number_of_science_packs.value / len(self.modpack.ordered_science_packs),
-                ingredients_offset=ingredients_offset.value)
-            self.custom_recipes["rocket-silo"] = new_recipe
-
-        if self.options.satellite.value == Satellite.option_randomize_recipe:
-            old_recipe = self.modpack.recipe_engine.recipes["satellite"]
-            new_recipe = self.make_balanced_recipe(
-                old_recipe, pools, -1,
-                factor=self.options.number_of_science_packs.value / len(self.modpack.ordered_science_packs),
-                ingredients_offset=ingredients_offset.value)
-            self.custom_recipes["satellite"] = new_recipe
-
-        bridge = GameItem(self.modpack.recipe_engine, "ap-energy-bridge", DefinitionSource.WORLD, False)
-        self.custom_products["ap-energy-bridge"] = bridge
-        new_recipe = self.make_custom_recipe(bridge.name, {bridge: 1}, 6+ingredients_offset.value, 10,
-            pools, 0)
-        for ingredient_name in new_recipe.ingredients:
-            new_recipe.ingredients[ingredient_name] = self.random.randint(50, 500)
-        self.custom_recipes[bridge.name] = new_recipe
-
-        needed_items = {self.get_internal_item(pack) for pack in self.get_allowed_packs()}
-        needed_items.add(self.custom_products["rocket-part"])
-        if self.options.silo != Silo.option_spawn:
-            needed_items.add(self.get_internal_item("rocket-silo"))
-            needed_items.add(self.get_internal_item("cargo-landing-pad"))
-        if self.options.goal.value == Goal.option_satellite:
-            needed_items.add(self.get_internal_item("satellite"))
-
-        for item in needed_items:
-            self.progression_technologies |= self.get_item_tech_req(item.name)
+        # needed_items = {self.get_internal_item(pack) for pack in self.get_allowed_packs()}
+        # needed_items.add(self.custom_products["rocket-part"])
+        # if self.options.silo != Silo.option_spawn:
+        #     needed_items.add(self.get_internal_item("rocket-silo"))
+        #     needed_items.add(self.get_internal_item("cargo-landing-pad"))
+        # if self.options.goal.value == Goal.option_satellite:
+        #     needed_items.add(self.get_internal_item("satellite"))
+        needed_techs = {tech for tech in self.modpack.base_technology_table.values() if tech.name in self.modpack.game_item_manager.technology_nodes} # todo reduce number of useless progression technologies
+        self.progression_technologies |= needed_techs
+        self.progression_technologies |= set(self.modpack.base_technology_table[tech] for tech, useless in self.modpack.force_useless_technologies.items() if not useless)
 
 
     def create_item(self, name: str) -> FactorioItem:
@@ -668,11 +658,11 @@ class FactorioBobs(World):
                                             },
                                             FactorioBobs.SLOT_MODPACK_NAME_KEY: self.options.packname.current_key,
                                             FactorioBobs.SLOT_RANDOM_RECIPES_KEY: {}}
-        for recipe in self.custom_recipes.values():
-            ingredients = []
-            for ingredient in recipe.ingredients:
-                ingredients.append(ingredient.name)
-            slot_data[FactorioBobs.SLOT_RANDOM_RECIPES_KEY][recipe.name] = ingredients
+        # for recipe in self.custom_recipes.values():
+        #     ingredients = []
+        #     for ingredient in recipe.ingredients:
+        #         ingredients.append(ingredient.name)
+        #     slot_data[FactorioBobs.SLOT_RANDOM_RECIPES_KEY][recipe.name] = ingredients
         return slot_data
 
     def explain_more(self, argument: str, state: CollectionState) -> list[JSONMessagePart]:
@@ -701,12 +691,12 @@ class FactorioBobs(World):
                     {"text": f"science pack not craftable: {packs_needed}\n"}]
         else:
             return [{"text": "Invalid argument only input science pack/location\n"}]
-        
+
     def post_fill(self) -> None:
-        
+
         start_location_hints: typing.Set[str] = self.options.start_location_hints.value
-        advancement_only: bool  = self.options.tech_tree_information.value == TechTreeInformation.option_full_only_hint_advancement
-        full_hints: bool  = self.options.tech_tree_information.value == TechTreeInformation.option_full
+        advancement_only: bool = self.options.tech_tree_information.value == TechTreeInformation.option_full_only_hint_advancement
+        full_hints: bool = self.options.tech_tree_information.value == TechTreeInformation.option_full
 
         def set_propper_hint(loc, pre_hint):
             # show start_location_hints ingame
@@ -720,7 +710,7 @@ class FactorioBobs(World):
                             start_location_hints.add(loc.name)
                     else:
                         start_location_hints.add(loc.name)
-            
+
             if loc.revealed:
                 if full_hints:
                     self.techs_to_hint[f"ap-{self.location_name_to_id[loc.name]}-"] = True
@@ -733,10 +723,12 @@ class FactorioBobs(World):
                 self.techs_to_hint[f"ap-{self.location_name_to_id[loc.name]}-"] = False
 
         for loc in self.science_locations:
-            set_propper_hint(loc, self.options.tech_layer_obscurity == TechLayerObscurity.disabled and self.options.tech_depth_obscurity == TechDepthObscurity.option_disabled)
+            set_propper_hint(loc,
+                             self.options.tech_layer_obscurity == TechLayerObscurity.disabled and self.options.tech_depth_obscurity == TechDepthObscurity.option_disabled)
 
-        #for loc in self.craftsanity_locations:
+        # for loc in self.craftsanity_locations:
         #    set_propper_hint(loc, self.options.tech_craft_obscurity == TechCraftObscurity.disabled)
+
 
 class FactorioLocation(Location):
     game: str = FactorioBobs.game

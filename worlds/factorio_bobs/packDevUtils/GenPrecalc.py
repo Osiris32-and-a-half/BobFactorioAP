@@ -15,10 +15,10 @@ def main():
 
     start = timeit.default_timer()
     output = {}
-    amount = len(modpack.recipe_engine.game_items)
+    amount = len(modpack.game_item_manager.game_items)
     done = 0
     mean_time = 0
-    items = modpack.recipe_engine.game_items.copy()
+    items = modpack.game_item_manager.game_items.copy()
     for item in items.values():
         item_timer = timeit.default_timer()
         print(f"Calculating: {item}")

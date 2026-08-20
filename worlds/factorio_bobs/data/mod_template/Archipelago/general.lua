@@ -118,23 +118,23 @@ end
 
 function general.recipes.tool_tips()
     return {
-        {%- for recipe_name, recipe in recipes.items() %}
-        ["{{recipe_name}}"] = {
-            name = "{{recipe_name}}",
-            catergories = {
-            {%- for techCat in recipe.technologies %}
-                 "{{techCat.tech.name}}",
-            {%- endfor %}
-            }
-        },
-        {%- endfor %}
+--         {%- for recipe_name, recipe in recipes.items() %}
+--         ["{{recipe_name}}"] = {
+--             name = "{{recipe_name}}",
+--             catergories = {
+--             {%- for techCat in recipe.technologies %}
+--                  "{{techCat.tech.name}}",
+--             {%- endfor %}
+--             }
+--         },
+--         {%- endfor %}
     }
 end
 
 general.recipes.enable_productivity = function ()
     return {
     {%- for recipe_name, recipe in recipes.items() %}
-    {%- if (recipe.source.value != 2 and recipe.productivity != None) %}
+    {%- if recipe.productivity != None %}
         "{{recipe_name}}",
     {%- endif %}
     {%- endfor %}

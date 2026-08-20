@@ -53,10 +53,3 @@ class CustomTechnology(Technology):
             ingredients = set(world.random.sample(list(ingredients), world.random.randint(1, len(ingredients))))
         self.ingredients = ingredients
         super(CustomTechnology, self).__init__(origin.name, origin.modpack)
-
-    def get_prior_technologies(self) -> Set[Technology]:
-        """Get Technologies that have to precede this one to resolve tree connections."""
-        technologies = set()
-        for ingredient in self.ingredients:
-            technologies |= self.modpack.required_technologies[ingredient]  # technologies that unlock the recipes
-        return technologies
