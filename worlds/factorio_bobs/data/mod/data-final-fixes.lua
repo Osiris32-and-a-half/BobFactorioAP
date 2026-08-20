@@ -190,6 +190,7 @@ for _, name in pairs(general.technologies.hide_from_player()) do
         error(name .." could not be found. This should be a technology that is present at this point in the loading stage. This is present in the list of technologies that need to be hidden from the player, but not in the game.")
     end
     local tech = technologies[name]
+    tech.archipelago_controlled = true
     tech.unit = nil
 
     if setting == "tech-tree" then
@@ -205,8 +206,8 @@ for _, name in pairs(general.technologies.hide_from_player()) do
 
     if setting == "hidden" then
         tech.hidden = true
-        tech.hidden_in_factoriopedia = true
     end
+    tech.hidden_in_factoriopedia = false  --does not have any effect weirdly enough.
 
     local stack_name = technology_name_to_progressive_group_name[name]
     if stack_name ~= nil then
@@ -225,9 +226,31 @@ for _, name in pairs(general.technologies.hide_from_player()) do
     end
 end
 
+local researched_techs = {}
 for _, name in pairs(general.technologies.removed_technologies()) do
     local tech = technologies[name]
     tech.order = "za-ap-unlocked"
     tech.research_trigger.trigger_description = {"archipelago.default-unlocked-script-trigger"}
     tech.research_trigger.icons = {final_lib.get_icon_from_type("unlocked")}
+    researched_techs[name] = true
+end
+
+
+for tech_name, tech in pairs(technologies) do
+    if not researched_techs[tech_name] and tech.effects then
+        for _, effect in pairs(tech.effects) do
+            if tech_name then
+                tech_name = string.gsub(tech_name, "%d$", "")
+            end
+            local tech_localized = tech.localised_name or ("technology-name."..tech_name)
+            local order = tech.order
+            if effect.type == "unlock-recipe" then
+                local recipe = data.raw.recipe[effect.recipe]
+                add_custom_tooltip_field(recipe, {"factoriopedia.recipe-unlock"}, {"", tech_localized}, false, order)
+                if tech.archipelago_controlled then
+                    add_custom_tooltip_field(recipe, {"factoriopedia.ap-unlock"}, tech.research_trigger.trigger_description, false, order)
+                end
+            end
+        end
+    end
 end
