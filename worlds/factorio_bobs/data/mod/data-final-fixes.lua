@@ -239,8 +239,8 @@ for tech_name, tech in pairs(technologies) do
     if not researched_techs[tech_name] and tech.effects then
         local temp_tech_localisation
         if string.find(tech_name, "-%d$") then
-            local pure_tech_name = string.gsub(tech_name, "-%d$", "")
-            local tech_number = string.gsub(tech_name, "^.+-", "")
+            local pure_tech_name = string.gsub(tech_name, "-%d$", "")  -- the - is a normal -.  %d matches any number 0-9  $ is the end of a string.
+            local tech_number = string.gsub(tech_name, "^.+-", "")  -- the ^ is the start of a string. the . is any character.  + is to have the longest possible amount of characters. the - is once again just a -.
             temp_tech_localisation = {"", {"technology-name."..pure_tech_name}, " "..tech_number}
         end
         for _, effect in pairs(tech.effects) do
