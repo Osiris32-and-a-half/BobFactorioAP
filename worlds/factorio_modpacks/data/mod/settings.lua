@@ -45,6 +45,15 @@ data:extend({
         allowed_values = {"never", "only-own", "always"}
     },
     {
+        type = "string-setting",
+        name = "archipelago-show-techs-in-tech-screen",
+        setting_type = "startup",
+        localised_name = {"mod-setting-name.archipelago-show-techs-in-tech-screen"},
+        localised_description = {"mod-setting-description.archipelago-show-techs-in-tech-screen"},
+        default_value = "broken-tree",
+        allowed_values = {"tech-tree", "broken-tree", "hidden"}
+    },
+    {
         type = "bool-setting",
         name = general.mod_setting_names.layer_obscurity,
         localised_name = {"mod-setting-name.archipelago-tech-layer-obscurity"},
@@ -69,5 +78,5 @@ data:extend({
         localised_description = {"mod-setting-description.archipelago-tech-craft-obscurity"},
         setting_type = "runtime-global",
         default_value = general.mod_setting_defaults.craft_obscurity
-    }
+    },
 })

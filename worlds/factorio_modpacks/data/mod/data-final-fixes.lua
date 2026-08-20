@@ -1,7 +1,7 @@
-
 local general = require("Archipelago/general")
 require("Archipelago/locations")
 require("Archipelago/custom_recipes")
+local final_lib = require('libs/final-fixes')
 
 data.raw["item"]["rocket-part"].hidden = false
 data.raw["rocket-silo"]["rocket-silo"].fluid_boxes = {
@@ -171,12 +171,89 @@ end
 
 local technologies = data.raw["technology"]
 
+local stack_position = {}
+local technology_name_to_progressive_group_name = {}
+for progressive_name, progressive_group in pairs(general.technologies.progressive()) do
+    local counter = 1
+    for _, item in pairs(progressive_group) do
+        technology_name_to_progressive_group_name[item] = progressive_name
+        if stack_position[item] == nil then --ensure only the first instance of this item is found.
+            stack_position[item] = counter
+        end
+        counter = counter + 1
+    end
+end
+
+local setting = settings.startup["archipelago-show-techs-in-tech-screen"].value
 for _, name in pairs(general.technologies.hide_from_player()) do
     if technologies[name] == nil then
         error(name .." could not be found. This should be a technology that is present at this point in the loading stage. This is present in the list of technologies that need to be hidden from the player, but not in the game.")
     end
-    technologies[name].hidden = true
-    technologies[name].hidden_in_factoriopedia = false
-    technologies[name].unit = nil
-    technologies[name].research_trigger = {type = "scripted", localised_description = {"technology-description.ap-technology-script-trigger"}}
+    local tech = technologies[name]
+    tech.archipelago_controlled = true
+    tech.unit = nil
+
+    if setting == "tech-tree" then
+        tech.prerequisites = tech.prerequisites or {}
+        table.insert(tech.prerequisites, "AP-lock")
+    else
+        tech.prerequisites = {"AP-lock"}
+    end
+    tech.research_trigger = {
+        type = "scripted",
+        icons = {final_lib.get_icon_from_type("advancement")}
+    }
+
+    if setting == "hidden" then
+        tech.hidden = true
+    end
+    tech.hidden_in_factoriopedia = false  --does not have any effect weirdly enough.
+
+    local stack_name = technology_name_to_progressive_group_name[name]
+    if stack_name ~= nil then
+        tech.research_trigger.trigger_description = {"archipelago.progressive-script-trigger", stack_position[name].."", stack_name}
+        --yes, adding that empty string is important.
+        if stack_position[name] < 10 then
+            tech.order = "zz-ap-"..stack_name.."-00"..stack_position[name]
+        elseif stack_position[name] < 100 then
+            tech.order = "zz-ap-"..stack_name.."-0"..stack_position[name]
+        else
+            tech.order = "zz-ap-"..stack_name.."-"..stack_position[name]
+        end
+    else
+        tech.research_trigger.trigger_description = {"archipelago.stand-alone-script-trigger", name}
+        tech.order = "zz-ap-"..name
+    end
+end
+
+local researched_techs = {}
+for _, name in pairs(general.technologies.removed_technologies()) do
+    local tech = technologies[name]
+    tech.order = "za-ap-unlocked"
+    tech.research_trigger.trigger_description = {"archipelago.default-unlocked-script-trigger"}
+    tech.research_trigger.icons = {final_lib.get_icon_from_type("unlocked")}
+    researched_techs[name] = true
+end
+
+for tech_name, tech in pairs(technologies) do
+    if not researched_techs[tech_name] and tech.effects then
+        local temp_tech_localisation
+        if string.find(tech_name, "-%d$") then
+            local pure_tech_name = string.gsub(tech_name, "-%d$", "")
+            local tech_number = string.gsub(tech_name, "^.+-", "")
+            temp_tech_localisation = {"", {"technology-name."..pure_tech_name}, " "..tech_number}
+        end
+        for _, effect in pairs(tech.effects) do
+            local tech_localised = tech.localised_name or temp_tech_localisation or  {"technology-name."..tech_name}
+            if effect.type == "unlock-recipe" then
+                local recipe = data.raw.recipe[effect.recipe]
+                local order = recipe.custom_tool_tip_order or 40
+                add_custom_tooltip_field(recipe, {"factoriopedia.recipe-unlock"}, tech_localised, false, order)
+                if tech.archipelago_controlled then
+                    add_custom_tooltip_field(recipe, {"factoriopedia.ap-unlock"}, tech.research_trigger.trigger_description, false, order+1)
+                end
+                recipe.custom_tool_tip_order = order + 2
+            end
+        end
+    end
 end
