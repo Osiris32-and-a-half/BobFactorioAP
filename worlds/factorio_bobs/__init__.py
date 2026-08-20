@@ -363,6 +363,9 @@ class FactorioBobs(World):
             victory_rule &= NodeRule(satellite_node)
         self.set_completion_rule(victory_rule)
 
+        # all_state = self.multiworld.get_all_state()
+        # print()
+
     def generate_basic(self):
         start_location_hints: typing.Set[str] = self.options.start_location_hints.value
 
@@ -623,6 +626,7 @@ class FactorioBobs(World):
         #     needed_items.add(self.get_internal_item("satellite"))
         needed_techs = {tech for tech in self.modpack.base_technology_table.values() if tech.name in self.modpack.game_item_manager.technology_nodes} # todo reduce number of useless progression technologies
         self.progression_technologies |= needed_techs
+        self.progression_technologies |= set(self.modpack.base_technology_table[tech] for tech, useless in self.modpack.force_useless_technologies.items() if not useless)
 
 
     def create_item(self, name: str) -> FactorioItem:

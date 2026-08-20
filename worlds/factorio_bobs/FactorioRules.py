@@ -65,6 +65,12 @@ class BaseLogic:
     @automate_path.setter
     def automate_path(self, value: Node | bool):
         self.__automate_path = value
+        #
+        # if value:
+        #     print(f"in: {self.owner.name}")
+        # else:
+        #     print(f"out: {self.owner.name}")
+
         if value and not self.manual_path:
             self.manual_path = value
             return # manual_path setter does call back
