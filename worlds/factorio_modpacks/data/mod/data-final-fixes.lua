@@ -75,8 +75,22 @@ if mods["factory-levels"] then
 end
 
 -- add all science packs to all labs
+local known_packs = {}
+for _, v in ipairs(general.science_packs.ordered) do
+    seen[v] = true
+end
+
 for lab in pairs(data.raw["lab"]) do
-    data.raw["lab"][lab].inputs = general.science_packs.ordered
+    local science_packs = {}
+    for i = 1, #general.science_packs.ordered do
+        science_packs[i] = general.science_packs.ordered[i]
+    end
+    for i = 1, #data.raw["lab"][lab].inputs do
+        if not known_packs[data.raw["lab"][lab].inputs[i] then
+            science_packs[i] = data.raw["lab"][lab].inputs[i]
+        end
+    end
+    data.raw["lab"][lab].inputs = science_packs
 end
 
 function add_custom_tooltip_field(item, localised_name, localised_string, show_in_tooltip, order)
