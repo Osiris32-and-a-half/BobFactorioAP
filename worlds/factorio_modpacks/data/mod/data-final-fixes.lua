@@ -77,7 +77,7 @@ end
 -- add all science packs to all labs
 local known_packs = {}
 for _, v in ipairs(general.science_packs.ordered) do
-    seen[v] = true
+    known_packs[v] = true
 end
 
 for lab in pairs(data.raw["lab"]) do
@@ -86,7 +86,7 @@ for lab in pairs(data.raw["lab"]) do
         science_packs[i] = general.science_packs.ordered[i]
     end
     for i = 1, #data.raw["lab"][lab].inputs do
-        if not known_packs[data.raw["lab"][lab].inputs[i] then
+        if not known_packs[data.raw["lab"][lab].inputs[i]] then
             science_packs[i] = data.raw["lab"][lab].inputs[i]
         end
     end
