@@ -202,7 +202,7 @@ class AnyLogic(BaseLogic):
         return False
 
 @dataclasses.dataclass()
-class NodeRule(Rule["FactorioBobs"], game="Factorio Modpacks"):
+class AutomateNodeRule(Rule["FactorioBobs"], game="Factorio Modpacks"):
     def __init__(self, node: Node):
         super().__init__()
         self.node = node
@@ -221,6 +221,27 @@ class NodeRule(Rule["FactorioBobs"], game="Factorio Modpacks"):
         def _evaluate(self, state: CollectionState) -> bool:
             return bool(state.node_logic[self.player][self.node].automate_path)
 
+@dataclasses.dataclass()
+class ManualNodeRule(Rule["FactorioBobs"], game="Factorio Modpacks"):
+    def __init__(self, node: Node):
+        super().__init__()
+        self.node = node
+        assert self.node.get_component(MultiLogicComponent)
+
+
+    @override
+    def _instantiate(self, world: FactorioBobs) -> Rule.Resolved:
+        # caching_enabled only needs to be passed in when your world inherits from CachedRuleBuilderWorld
+        return self.Resolved(self.node, player=world.player, caching_enabled=False)
+
+    class Resolved(Rule.Resolved):
+        node: Node
+
+        @override
+        def _evaluate(self, state: CollectionState) -> bool:
+            return bool(state.node_logic[self.player][self.node].manual_path)
+
+
 def process_yaml_rule(rule_pair: dict[str, str | list], modpack: FactorioModpack) -> Rule:
     rule_type, rule_value = next(iter(rule_pair.items()))
     if rule_type == "and":
@@ -232,8 +253,8 @@ def process_yaml_rule(rule_pair: dict[str, str | list], modpack: FactorioModpack
         return Has(rule_value)
     if rule_type == "item":
         # assert rule_value in modpack.game_item_manager.game_items.keys(), f"{rule_value} is not a valid item in rules"
-        return NodeRule(modpack.game_item_manager.get_item_node(rule_value))
+        return AutomateNodeRule(modpack.game_item_manager.get_item_node(rule_value))
     if rule_type == "recipe":
         # assert rule_value in modpack.game_item_manager.recipes.keys(), f"{rule_value} is not a valid recipe in rules"
-        return NodeRule(modpack.game_item_manager.get_recipe_node(rule_value))
+        return AutomateNodeRule(modpack.game_item_manager.get_recipe_node(rule_value))
     raise ValueError(f"Unknown rule type {rule_type}")
