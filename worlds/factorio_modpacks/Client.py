@@ -641,7 +641,7 @@ class FactorioJSONtoTextParser(JSONtoTextParser):
 
 
 factorio_server_logger = logging.getLogger("FactorioServer")
-settings: FactorioSettings = get_settings().factorio_bobs_options
+settings: FactorioSettings = get_settings().factorio_modpacks_options
 if os.path.samefile(settings.executable, sys.executable):
     selected_executable = settings.executable
     settings.executable = FactorioSettings.executable  # reset to default
