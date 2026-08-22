@@ -219,7 +219,9 @@ class GameItemManager:
                     recipe.add_required(technology_node, 0)
 
             for recipe_name in technology.unlocks:
-                add_technology(self.recipe_engine.nodes[f"recipe_{recipe_name}"], technology_node)
+                if recipe_name in self.modpack.start_unlocked_recipes:
+                    continue
+                add_technology(self.get_recipe_node(recipe_name), technology_node)
 
     def __load_settings(self) -> None:
         with self.modpack.open_file("recipeEngineSettings.json") as file:
