@@ -343,7 +343,7 @@ class FactorioRecipeComponent(BaseNodeComponent):
                 continue
             ingredient_data = ingredient.get_component(FactorioItemComponent)
             lua_ingredients.append((f"{{"
-                                    f"type = \"{"fluid" if ingredient_data.is_fluid else "liquid"}\", "
+                                    f"type = \"{"fluid" if ingredient_data.is_fluid else "item"}\", "
                                     f"name = \"{ingredient_data.owner.name[5:]}\", "
                                     f"amount = {floor(1 / ingredient.used_by[self.owner])}"
                                     f"}}"))
@@ -356,7 +356,7 @@ class FactorioRecipeComponent(BaseNodeComponent):
                 continue
             product_data = product.get_component(FactorioItemComponent)
             lua_products.append((f"{{"
-                                 f"type = \"{"fluid" if product_data.is_fluid else "liquid"}\", "
+                                 f"type = \"{"fluid" if product_data.is_fluid else "item"}\", "
                                  f"name = \"{product_data.owner.name[5:]}\", "
                                  f"amount = {floor(self.owner.used_by[product])}"
                                  f"}}"))
