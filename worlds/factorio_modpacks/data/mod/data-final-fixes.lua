@@ -118,15 +118,6 @@ for _, name in pairs(general.recipes.enable_productivity()) do
     data.raw["recipe"][name].allow_productivity = true
 end
 
-
-for name, info in pairs(general.recipes.tool_tips()) do
-    if data.raw["recipe"][name] then
-        for _, category in pairs(info.catergories) do
-            add_custom_tooltip_field(data.raw["recipe"][name], {"","recipe_unlock"}, {"",category}, false, 200)
-        end
-    end
-end
-
 -- Beserker note: This got complex, but seems to be required to hit all corner cases
 local function adjust_energy(recipe_name, factor)
     local recipe = data.raw.recipe[recipe_name]

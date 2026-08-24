@@ -116,21 +116,6 @@ function general.recipes.time_adjustments()
     }
 end
 
-function general.recipes.tool_tips()
-    return {
---         {%- for recipe_name, recipe in recipes.items() %}
---         ["{{recipe_name}}"] = {
---             name = "{{recipe_name}}",
---             catergories = {
---             {%- for techCat in recipe.technologies %}
---                  "{{techCat.tech.name}}",
---             {%- endfor %}
---             }
---         },
---         {%- endfor %}
-    }
-end
-
 general.recipes.enable_productivity = function ()
     return {
     {%- for recipe_name, recipe in recipes.items() %}
