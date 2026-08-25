@@ -232,6 +232,7 @@ for _, name in pairs(general.technologies.hide_from_player()) do
 end
 
 local researched_techs = {}
+researched_techs["Starting-recipes"] = true
 for _, name in pairs(general.technologies.removed_technologies()) do
     local tech = technologies[name]
     tech.order = "za-ap-unlocked"
