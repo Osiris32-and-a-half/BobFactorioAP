@@ -1,4 +1,4 @@
-{% from "macros.lua" import dict_to_recipe, dict_to_lua, variable_to_lua %}
+{% from "macros.lua" import dict_to_recipe, dict_to_lua, variable_to_lua, list_to_lua %}
 -- this file gets written automatically by the Archipelago Randomizer and is in its raw form a Jinja2 Template
 
 local general = {}
@@ -50,6 +50,10 @@ general.free_samples.state = {{ free_samples }} --0 means no samples, 1 means si
 
 function general.free_samples.get_starter_items()
     return {{ dict_to_lua(starting_items) }}
+end
+
+function general.get_starting_recipes()
+    return {{ list_to_lua(starting_recipes) }}
 end
 
 function general.free_samples.get_black_list()--returns a big list of all items. false / nil is whitelist and true is blacklisted.
@@ -113,21 +117,6 @@ function general.recipes.time_adjustments()
         {%- endif %}
         {%- endfor -%}
         {% endif %}
-    }
-end
-
-function general.recipes.tool_tips()
-    return {
---         {%- for recipe_name, recipe in recipes.items() %}
---         ["{{recipe_name}}"] = {
---             name = "{{recipe_name}}",
---             catergories = {
---             {%- for techCat in recipe.technologies %}
---                  "{{techCat.tech.name}}",
---             {%- endfor %}
---             }
---         },
---         {%- endfor %}
     }
 end
 

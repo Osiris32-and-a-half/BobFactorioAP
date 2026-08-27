@@ -34,8 +34,8 @@ add_normal_custom_recipe(
     "{{recipe_name}}",
     "{{recipe.category}}",
     {{recipe.energy}},
-    {{dict_to_recipe(recipe.ingredients)}},
-    {{dict_to_recipe(recipe.products)}},
+    {{recipe.ingredients_export()}},
+    {{recipe.products_export()}},
     {{variable_to_lua(recipe.productivity)}}
 )
 {%- endfor %}

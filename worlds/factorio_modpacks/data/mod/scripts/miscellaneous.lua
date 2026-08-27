@@ -171,6 +171,7 @@ local function on_force_created(event)
             log("Recoverable Error: No technology found for name "..name.." in removed_technologies")
         end
     end
+    force.technologies["Starting-recipes"].researched = true
 end
 
 local function on_force_destroyed(event)

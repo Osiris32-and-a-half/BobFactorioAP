@@ -4,6 +4,7 @@ import collections
 import logging
 import random
 import typing
+from typing import Optional
 
 import Utils
 from BaseClasses import Region, Location, Item, Tutorial, ItemClassification, CollectionState
@@ -15,7 +16,7 @@ from .APModpackManager import get_items, get_locations, items_to_id, get_item_gr
 from .FactorioModpack import FactorioModpack
 from .FactorioOptions import (FactorioOptions, Silo, Satellite, TechTreeInformation, Goal,
                               TechCostDistribution, option_groups, TechLayerObscurity, TechDepthObscurity)
-from .FactorioRules import process_yaml_rule, Rule, NodeRule, AnyLogic
+from .FactorioRules import process_yaml_rule, Rule, AutomateNodeRule, AnyLogic, ManualNodeRule
 from .FactorioSettings import FactorioSettings
 from .Mod import generate_mod
 from .RecipeEngine.NodeComponents.LogicComponents import MultiLogicComponent
@@ -207,6 +208,7 @@ class FactorioBobs(World):
         nauvis = Region(self.origin_region_name, player, self.multiworld)
 
         location_count = len(self.modpack.base_technology_table) - len(self.modpack.removed_technologies) - self.skip_silo
+        self.location_count = location_count
 
         for name in self.trap_names:
             name = name.replace(" ", "_").lower()+"_traps"
@@ -257,6 +259,8 @@ class FactorioBobs(World):
             location.count = rand_values[i]
         del rand_values
         nauvis.locations.extend(self.science_locations)
+
+
         location = FactorioLocation(player, "Rocket Launch", None, nauvis)
         nauvis.locations.append(location)
         event = FactorioItem("Victory", ItemClassification.progression, None, player)
@@ -286,6 +290,7 @@ class FactorioBobs(World):
                 loc.revealed = True
         if self.skip_silo:
             self.removed_technologies |= {"rocket-silo"}
+        self.item_count = 0
         for tech_name in self.modpack.base_technology_table.keys():
             if tech_name not in self.removed_technologies:
                 progressive_item_name = self.modpack.tech_to_progressive_lookup.get(tech_name, tech_name)
@@ -295,6 +300,7 @@ class FactorioBobs(World):
                 index = special_index.get(tech_name, None)
                 if index is None:
                     self.multiworld.itempool.append(tech_item)
+                    self.item_count+=1
                 else:
                     loc = cost_sorted_locations[index]
                     if index >= 0:
@@ -303,6 +309,7 @@ class FactorioBobs(World):
                         loc.count = min(loc.count, 10)
                     loc.place_locked_item(tech_item)
                     loc.revealed = True
+                    self.item_count+=1
 
     def get_filler_item_name(self) -> str:
         tech_name: str = self.random.choice(tuple(self.modpack.technology_table.keys()))
@@ -311,20 +318,22 @@ class FactorioBobs(World):
         return progressive_item_name if want_progressive else tech_name
 
     def set_rules(self):
-        player = self.player
         game_item_manager = self.modpack.game_item_manager
+        all_state = self.multiworld.get_all_state()
 
         shapes = get_shapes(self)
 
+        assert self.location_count == self.item_count
+
         science_packs = self.modpack.ordered_science_packs[:self.options.number_of_science_packs]
         for complexity, science_pack in enumerate(science_packs, start=1):
-            if science_pack == "automation-science-pack":
-                continue
             location = self.get_location(f"Automate {science_pack}")
-
             science_pack_node = game_item_manager.get_item_node(science_pack)
 
-            rule = NodeRule(science_pack_node)
+            if complexity == 1:
+                rule = ManualNodeRule(science_pack_node)
+            else:
+                rule = AutomateNodeRule(science_pack_node)
 
             if self.options.additional_logic.value == self.options.additional_logic.option_default:
                 if complexity in self.modpack.default_options["additional_logic"]:
@@ -336,6 +345,14 @@ class FactorioBobs(World):
                     rule &= additional_logic_rule
 
             self.set_rule(location, rule)
+
+            if complexity == 1:
+                state = CollectionState(self.multiworld)
+                if not state.can_reach_location(location.name, self.player):
+                    raise Exception(f"{self.player_name} ({self.modpack.packName}): Unable to start with {location.name}")
+
+            if not all_state.can_reach_location(location.name, self.player):
+                raise Exception(f"{self.player_name} ({self.modpack.packName}): Unable to reach {location.name}")
 
         for location in self.science_locations:
             rule = And(*(Has(f"Automated {ingredient_name}") for ingredient_name in location.ingredients))
@@ -349,18 +366,24 @@ class FactorioBobs(World):
             #     all(state.has(f"Automated {ingredient}", player) for ingredient in ingredients))
 
         rocket_part_node = game_item_manager.get_item_node("rocket-part")
-        victory_rule: Rule = NodeRule(rocket_part_node)
+        victory_rule: Rule = AutomateNodeRule(rocket_part_node)
         if self.options.silo != Silo.option_spawn:
             rocket_silo_node = game_item_manager.get_item_node("rocket-silo")
-            victory_rule &= NodeRule(rocket_silo_node)
+            victory_rule &= AutomateNodeRule(rocket_silo_node)
 
             cargo_landing_pad_node = game_item_manager.get_item_node("cargo-landing-pad")
-            victory_rule &= NodeRule(cargo_landing_pad_node)
+            victory_rule &= AutomateNodeRule(cargo_landing_pad_node)
 
         if self.options.goal == Goal.option_satellite:
             satellite_node = game_item_manager.get_item_node("satellite")
-            victory_rule &= NodeRule(satellite_node)
-        self.set_completion_rule(victory_rule)
+            victory_rule &= AutomateNodeRule(satellite_node)
+
+        self.set_rule(self.get_location("Rocket Launch"), victory_rule)
+
+        self.set_completion_rule(Has("Victory"))
+
+        if not all_state.can_reach_location("Rocket Launch", self.player):
+            raise Exception(f"{self.player_name} ({self.modpack.packName}): Unable to goal")
 
         # all_state = self.multiworld.get_all_state()
         # print()
@@ -376,44 +399,35 @@ class FactorioBobs(World):
             elif loc.revealed:
                 start_location_hints.add(loc.name)
 
-    # def collect_item(self, state, item, remove=False):
-    #     # if item.advancement and item.name in self.modpack.progressive_technology_table:
-    #     #     prog_table = self.modpack.progressive_technology_table[item.name].progressive
-    #     #     if remove:
-    #     #         for item_name in reversed(prog_table):
-    #     #             if state.has(item_name, item.player):
-    #     #                 return item_name
-    #     #     else:
-    #     #         for item_name in prog_table:
-    #     #             if not state.has(item_name, item.player):
-    #     #                 return item_name
-    #     return super(FactorioBobs, self).collect_item(state, item, remove)
+    def collect_item(self, state: "CollectionState", item: "Item", remove: bool = False) -> Optional[str]:
+        if item.advancement:
+            item_name = self.get_item_name(state, item, remove)
+            if item_name in self.modpack.game_item_manager.technology_nodes:
+                node = self.modpack.game_item_manager.technology_nodes[item_name]
+                if remove:
+                    state.node_logic[self.player][node].disable()
+                else:
+                    state.node_logic[self.player][node].force_enable()
+            return item_name
 
-    def collect(self, state: CollectionState, item: Item) -> bool:
-        change = super().collect(state, item)
-        item_name = item.name
+        return super(FactorioBobs, self).collect_item(state, item, remove)
 
-        if item_name in self.modpack.progressive_technology_table:
-            stage = state.count(item.name, self.player)
-            item_name = self.modpack.progressive_technology_table[item_name].progressive[stage-1]
+    def get_item_name(self, state, item, remove=False):
+        if item.advancement and item.name in self.modpack.progressive_technology_table:
+            prog_table = self.modpack.progressive_technology_table[item.name].progressive
+            if remove:
+                for item_name in reversed(prog_table):
+                    if state.has(item_name, item.player):
+                        return item_name
+            else:
+                for item_name in prog_table:
+                    if not state.has(item_name, item.player):
+                        if item_name in self.modpack.game_item_manager.technology_nodes:
+                            node = self.modpack.game_item_manager.technology_nodes[item_name]
+                            state.node_logic[self.player][node].force_enable()
+                        return item_name
+        return super(FactorioBobs, self).collect_item(state, item, remove)
 
-        if change and item_name in self.modpack.game_item_manager.technology_nodes:
-            node = self.modpack.game_item_manager.technology_nodes[item_name]
-            state.node_logic[self.player][node].force_enable()
-        return change
-
-    def remove(self, state: CollectionState, item: Item) -> bool:
-        change = super().remove(state, item)
-        item_name = item.name
-
-        if item_name in self.modpack.progressive_technology_table:
-            stage = state.count(item.name, self.player)
-            item_name = self.modpack.progressive_technology_table[item_name].progressive[stage]
-
-        if change and item_name in self.modpack.game_item_manager.technology_nodes:
-            node = self.modpack.game_item_manager.technology_nodes[item.name]
-            state.node_logic[self.player][node].disable()
-        return change
 
     @classmethod
     def stage_write_spoiler(cls, world, spoiler_handle):

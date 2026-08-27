@@ -2,6 +2,7 @@ local general = require("Archipelago/general")
 require("Archipelago/locations")
 require("Archipelago/custom_recipes")
 local final_lib = require('libs/final-fixes')
+local util = require("util")
 
 data.raw["item"]["rocket-part"].hidden = false
 data.raw["rocket-silo"]["rocket-silo"].fluid_boxes = {
@@ -74,13 +75,14 @@ if mods["factory-levels"] then
     end
 end
 
+-- add all science packs to all labs
 local all_packs_in_labs = {}
 for _, name in pairs(general.science_packs.ordered) do
     all_packs_in_labs[name] = true
 end
--- add all science packs to all labs
+
 for lab in pairs(data.raw["lab"]) do
-    local inputs = general.science_packs.ordered
+    local inputs = util.deep_copy(general.science_packs.ordered)
     for _, name in pairs(data.raw["lab"][lab].inputs) do
         all_packs_in_labs[name] = true
         inputs = table.insert(inputs, name)
@@ -143,15 +145,6 @@ for _, name in pairs(general.recipes.enable_productivity()) do
         error(name .." could not be found. This should be a recipe that is present at this point in the loading stage. This recipe is present in the list of recipes that get their productivity enabled.")
     end
     data.raw["recipe"][name].allow_productivity = true
-end
-
-
-for name, info in pairs(general.recipes.tool_tips()) do
-    if data.raw["recipe"][name] then
-        for _, category in pairs(info.catergories) do
-            add_custom_tooltip_field(data.raw["recipe"][name], {"","recipe_unlock"}, {"",category}, false, 200)
-        end
-    end
 end
 
 -- Beserker note: This got complex, but seems to be required to hit all corner cases
@@ -268,6 +261,7 @@ for _, name in pairs(general.technologies.hide_from_player()) do
 end
 
 local researched_techs = {}
+researched_techs["Starting-recipes"] = true
 for _, name in pairs(general.technologies.removed_technologies()) do
     local tech = technologies[name]
     tech.order = "za-ap-unlocked"

@@ -219,7 +219,9 @@ class GameItemManager:
                     recipe.add_required(technology_node, 0)
 
             for recipe_name in technology.unlocks:
-                add_technology(self.recipe_engine.nodes[f"recipe_{recipe_name}"], technology_node)
+                if recipe_name in self.modpack.start_unlocked_recipes:
+                    continue
+                add_technology(self.get_recipe_node(recipe_name), technology_node)
 
     def __load_settings(self) -> None:
         with self.modpack.open_file("recipeEngineSettings.json") as file:
@@ -334,20 +336,28 @@ class FactorioRecipeComponent(BaseNodeComponent):
                 return node.name[9:]
         raise Exception(f"couldn't find category for {self.owner.name}")
 
-    @property
-    def ingredients(self) -> dict[str, int]:
-        ret: dict[str, int] = {}
+    def ingredients_export(self) -> str:
+        lua_ingredients: list[str] = []
         for ingredient in self.owner.required:
             if not isinstance(ingredient, ItemNode):
                 continue
-            ret[ingredient.name[5:]] = floor(1/ingredient.used_by[self.owner])
-        return ret
+            ingredient_data = ingredient.get_component(FactorioItemComponent)
+            lua_ingredients.append((f"{{"
+                                    f"type = \"{"fluid" if ingredient_data.is_fluid else "item"}\", "
+                                    f"name = \"{ingredient_data.owner.name[5:]}\", "
+                                    f"amount = {floor(1 / ingredient.used_by[self.owner])}"
+                                    f"}}"))
+        return f"{{{",".join(lua_ingredients)}}}"
 
-    @property
-    def products(self) -> dict[str, int]:
-        ret: dict[str, int] = {}
+    def products_export(self) -> str:
+        lua_products: list[str] = []
         for product in self.owner.used_by:
             if not isinstance(product, ItemNode):
                 continue
-            ret[product.name[5:]] = floor(self.owner.used_by[product])
-        return ret
+            product_data = product.get_component(FactorioItemComponent)
+            lua_products.append((f"{{"
+                                 f"type = \"{"fluid" if product_data.is_fluid else "item"}\", "
+                                 f"name = \"{product_data.owner.name[5:]}\", "
+                                 f"amount = {floor(self.owner.used_by[product])}"
+                                 f"}}"))
+        return f"{{{",".join(lua_products)}}}"
