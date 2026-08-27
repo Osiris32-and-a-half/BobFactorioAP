@@ -87,7 +87,7 @@ local starting_recipe_technology = {
         type           = "technology",
         name           = "Starting-recipes",
         --hidden         = true,
-        icons          = library.get_icon_from_type("advancement"),
+        icons          = {require('libs/final-fixes').get_icon_from_type("advancement")},
         research_trigger = {
             type = "scripted",
         },
