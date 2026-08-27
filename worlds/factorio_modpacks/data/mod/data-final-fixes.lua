@@ -81,11 +81,14 @@ for _, name in pairs(general.science_packs.ordered) do
     all_packs_in_labs[name] = true
 end
 
+local ap_packs = util.table.deepcopy(all_packs_in_labs)
 for lab in pairs(data.raw["lab"]) do
-    local inputs = util.deep_copy(general.science_packs.ordered)
+    local inputs = util.table.deepcopy(general.science_packs.ordered)
     for _, name in pairs(data.raw["lab"][lab].inputs) do
         all_packs_in_labs[name] = true
-        inputs = table.insert(inputs, name)
+        if not ap_packs[name] then
+            table.insert(inputs, name)
+        end
     end
     data.raw["lab"][lab].inputs = inputs
 end
@@ -116,11 +119,11 @@ for pack, _ in pairs(all_packs_in_labs) do
     create_trigger_science_pack(pack)
 end
 
-data:extend({
+data:extend({{
     type = "mod-data",
     name = "all-science-packs",
     data = all_packs_in_labs
-})
+}})
 
 function add_custom_tooltip_field(item, localised_name, localised_string, show_in_tooltip, order)
     if item.custom_tooltip_fields == nil then

@@ -83,20 +83,21 @@ for _, name in pairs(general.science_packs.allowed) do
     table.insert(data.raw.technology["AP-lock"].unit.ingredients, {name, 65535})
 end
 
-starting_recipe_technology = {
+local starting_recipe_technology = {
         type           = "technology",
         name           = "Starting-recipes",
-        hidden         = true,
-        icon           = "__"..general.mod_name.."__/graphics/icons/gears_bright.png",
+        --hidden         = true,
+        icons          = {{
             icon = "__"..general.mod_name.."__/graphics/icons/gears_bright.png",
             icon_size = 300,
             scale = 0.426
-        },
+        }},
         research_trigger = {
             type = "scripted",
         },
         effects        = {},
     }
+
 for _, recipe_name in pairs(general.get_starting_recipes()) do
     print("abctest"..recipe_name)
     table.insert(starting_recipe_technology.effects, {type  = "unlock-recipe", recipe = recipe_name})
