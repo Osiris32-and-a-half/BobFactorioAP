@@ -87,11 +87,7 @@ local starting_recipe_technology = {
         type           = "technology",
         name           = "Starting-recipes",
         --hidden         = true,
-        icons          = {{
-            icon = "__"..general.mod_name.."__/graphics/icons/gears_bright.png",
-            icon_size = 300,
-            scale = 0.426
-        }},
+        icons          = library.get_icon_from_type("advancement"),
         research_trigger = {
             type = "scripted",
         },
@@ -99,7 +95,6 @@ local starting_recipe_technology = {
     }
 
 for _, recipe_name in pairs(general.get_starting_recipes()) do
-    print("abctest"..recipe_name)
     table.insert(starting_recipe_technology.effects, {type  = "unlock-recipe", recipe = recipe_name})
 end
 

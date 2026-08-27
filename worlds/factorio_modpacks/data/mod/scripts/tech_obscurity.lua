@@ -291,7 +291,7 @@ local function setup_storage(force)
 end
 
 local function on_research_finished(event)
-    for _, pack_name in pairs(game.mod_data["all-science-packs"]) do
+    for _, pack_name in pairs(prototypes.mod_data["all-science-packs"].data) do
         if event.research.name == "achipellago-trigger-"..pack_name then
             if storage.forces[event.research.force.name].science_packs_name[pack_name] ~= nil then
                 storage.forces[event.research.force.name].science_packs_name[pack_name].crafted  = true
