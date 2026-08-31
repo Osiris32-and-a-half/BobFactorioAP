@@ -2,6 +2,7 @@ local general = require("Archipelago/general")
 require("Archipelago/locations")
 require("Archipelago/custom_recipes")
 local final_lib = require('libs/final-fixes')
+local util = require("util")
 
 data.raw["item"]["rocket-part"].hidden = false
 data.raw["rocket-silo"]["rocket-silo"].fluid_boxes = {
@@ -75,23 +76,54 @@ if mods["factory-levels"] then
 end
 
 -- add all science packs to all labs
-local known_packs = {}
-for _, v in ipairs(general.science_packs.ordered) do
-    known_packs[v] = true
+local all_packs_in_labs = {}
+for _, name in pairs(general.science_packs.ordered) do
+    all_packs_in_labs[name] = true
 end
 
+local ap_packs = util.table.deepcopy(all_packs_in_labs)
 for lab in pairs(data.raw["lab"]) do
-    local science_packs = {}
-    for i = 1, #general.science_packs.ordered do
-        science_packs[i] = general.science_packs.ordered[i]
-    end
-    for i = 1, #data.raw["lab"][lab].inputs do
-        if not known_packs[data.raw["lab"][lab].inputs[i]] then
-            science_packs[i] = data.raw["lab"][lab].inputs[i]
+    local inputs = util.table.deepcopy(general.science_packs.ordered)
+    for _, name in pairs(data.raw["lab"][lab].inputs) do
+        all_packs_in_labs[name] = true
+        if not ap_packs[name] then
+            table.insert(inputs, name)
         end
     end
-    data.raw["lab"][lab].inputs = science_packs
+    data.raw["lab"][lab].inputs = inputs
 end
+
+local function create_trigger_science_pack(pack)
+    local pack_item = data.raw.tool[pack]
+    if pack_item == nil then
+        pack_item = data.raw.item[pack]
+    end
+    local pack_localised_name = pack_item.localised_name or {"item-name."..pack_item.name} or pack
+    local pack_trigger = {
+        type           = "technology",
+        name           = "achipellago-trigger-"..pack,
+        localised_name = {"technology-name.crafted-science-pack", pack_localised_name},
+        icon           = pack_item.icon,
+        icons          = pack_item.icons,
+        icon_size      = pack_item.icon_size,
+        hidden         = true,
+        research_trigger = {
+            type = "craft-item",
+            item = pack,
+        },
+    }
+    data:extend{pack_trigger}
+end
+
+for pack, _ in pairs(all_packs_in_labs) do
+    create_trigger_science_pack(pack)
+end
+
+data:extend({{
+    type = "mod-data",
+    name = "all-science-packs",
+    data = all_packs_in_labs
+}})
 
 function add_custom_tooltip_field(item, localised_name, localised_string, show_in_tooltip, order)
     if item.custom_tooltip_fields == nil then

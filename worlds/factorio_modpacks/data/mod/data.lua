@@ -39,32 +39,6 @@ data.raw["recipe"]["ap-energy-bridge"] = energy_bridge_recipe
 
 data.raw["map-gen-presets"].default["archipelago"] = general.map_preset
 
-local function create_trigger_science_pack(pack)
-    local pack_item = data.raw.tool[pack]
-    if pack_item == nil then
-        pack_item = data.raw.item[pack]
-    end
-    local pack_localised_name = pack_item.localised_name or {"item-name."..pack_item.name} or pack
-    local pack_trigger = {
-        type           = "technology",
-        name           = "achipellago-trigger-"..pack,
-        localised_name = {"technology-name.crafted-science-pack", pack_localised_name},
-        icon           = pack_item.icon,
-        icons          = pack_item.icons,
-        icon_size      = pack_item.icon_size,
-        hidden         = true,
-        research_trigger = {
-            type = "craft-item",
-            item = pack,
-        },
-    }
-    data:extend{pack_trigger}
-end
-
-for _, pack in pairs(general.science_packs.ordered) do
-    create_trigger_science_pack(pack)
-end
-
 if mods["science-not-invited"] then
     --this should make these mods still compatiable.
     local weights = {}
@@ -109,22 +83,18 @@ for _, name in pairs(general.science_packs.allowed) do
     table.insert(data.raw.technology["AP-lock"].unit.ingredients, {name, 65535})
 end
 
-starting_recipe_technology = {
+local starting_recipe_technology = {
         type           = "technology",
         name           = "Starting-recipes",
-        hidden         = true,
-        icon           = "__"..general.mod_name.."__/graphics/icons/gears_bright.png",
-            icon = "__"..general.mod_name.."__/graphics/icons/gears_bright.png",
-            icon_size = 300,
-            scale = 0.426
-        },
+        --hidden         = true,
+        icons          = {require('libs/final-fixes').get_icon_from_type("advancement")},
         research_trigger = {
             type = "scripted",
         },
         effects        = {},
     }
+
 for _, recipe_name in pairs(general.get_starting_recipes()) do
-    print("abctest"..recipe_name)
     table.insert(starting_recipe_technology.effects, {type  = "unlock-recipe", recipe = recipe_name})
 end
 

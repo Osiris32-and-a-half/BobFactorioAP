@@ -256,19 +256,18 @@ local function setup_storage(force)
     for name, tech in pairs(game.forces[force.name].technologies) do
         if tech.prototype.hidden == false then
             if tech.prototype.research_trigger == nil then
+                for _, packs in pairs(tech.research_unit_ingredients) do
+                    if done_packs[packs.name] ~= true then
+                        done_packs[packs.name] = true
+                        science_packs_name[packs.name] = {name = packs.name, crafted = false}
+                    end
+                end
                 if settings.global[general.mod_setting_names.layer_obscurity].value or settings.global[general.mod_setting_names.depth_obscurity].value>=1 then
                     hidden_science_tech[tech.name] = true
-                    for _, packs in pairs(tech.research_unit_ingredients) do
-                        if done_packs[packs.name] ~= true then
-                            done_packs[packs.name] = true
-                            science_packs_name[packs.name] = {name = packs.name, crafted = false}
-                        end
-                    end
                     tech.enabled = false
                 end
             elseif tech.prototype.research_trigger and (tech.prototype.research_trigger.type == "craft-item" or tech.prototype.research_trigger.type == "craft-fluid") then
-                if settings.global[general.mod_setting_names.craft_obscurity].value then
-                
+                    if settings.global[general.mod_setting_names.craft_obscurity].value then
                     local trigger_name
                     if tech.prototype.research_trigger.type == "craft-item" then
                         trigger_name = tech.prototype.research_trigger.item.name
@@ -276,7 +275,6 @@ local function setup_storage(force)
                         trigger_name = tech.prototype.research_trigger.fluid
                     end
 
-                    hidden_trigger_tech[tech.name] = true
                     if done_triggers[trigger_name] ~= true then
                         if triggers[trigger_name] == nil then
                             triggers[trigger_name] = {name = trigger_name, unlocked_triggered = false, technologies = {tech.name}}
@@ -284,6 +282,7 @@ local function setup_storage(force)
                             table.insert(triggers[trigger_name].technologies, tech.name)
                         end
                     end
+                    hidden_trigger_tech[tech.name] = true
                     tech.enabled = false
                 end
             end
@@ -292,9 +291,11 @@ local function setup_storage(force)
 end
 
 local function on_research_finished(event)
-    for _, pack_name in pairs(general.science_packs.ordered) do
+    for pack_name, _ in pairs(prototypes.mod_data["all-science-packs"].data) do
         if event.research.name == "achipellago-trigger-"..pack_name then
-            storage.forces[event.research.force.name].science_packs_name[pack_name].crafted  = true
+            if storage.forces[event.research.force.name].science_packs_name[pack_name] ~= nil then
+                storage.forces[event.research.force.name].science_packs_name[pack_name].crafted  = true
+            end
         end
     end
     if storage.trap_memory.peekaboo == nil or storage.trap_memory.peekaboo.active == false then
@@ -305,7 +306,7 @@ end
 
 local function on_force_created(event)
     setup_storage(event.force)
-    log(event.force.name .. "Has been made/called")
+    log(event.force.name .. " Has been made/called")
 end
 
 local function update_surface_based_techs(surface, resending)
@@ -366,6 +367,16 @@ local function on_surface_created(event)
     update_surface_based_techs(game.surfaces[event.surface_index], false)
 end
 
+local function on_runtime_mod_setting_changed(event)
+    if event.setting == general.mod_setting_names.layer_obscurity or event.setting == general.mod_setting_names.depth_obscurity or general.mod_setting_names.craft_obscurity then
+        if storage.trap_memory.peekaboo == nil or storage.trap_memory.peekaboo.active == false then
+            for _, force in pairs(game.forces) do
+                update_all_sciences(force)
+            end
+        end
+    end
+end
+
 local function on_init()
     storage.hinted_techs = {} --will ensure hints are only send once.
     for name, tech in pairs(prototypes.technology) do
@@ -382,15 +393,15 @@ local function on_init()
 end
 
 local function on_configuration_changed()
-    game.print("I see that you have changed your configuration.\n But as I was not asked I am going to ignore anything extra. And probably give errors on removed techs.\n~~the tech obscurity of the archipelago mod")
+    game.print("I see that you have changed your configuration (startup setting and/or added/removed mods.)\nI am going to ignore any new techs that might have been added.\n~~the tech obscurity of the archipelago mod")
 end
 
 commands.add_command("ap-receive-hint", "Used by the Archipelago client to manage the tech tree hints", function(call)
 
     tech_name = call.parameter or "failed"
     if tech_name == "failed" then --take care of errors
-        log("failure has occured")
-        game.print("a failure with recieving a hint has occured")
+        log("failure has occurred")
+        game.print("a failure with receiving a hint has occurred")
     else
         receive_hint(tech_name) --from the perspective of factorio.
     end
@@ -420,6 +431,7 @@ lib.events = {
     [defines.events.on_research_finished] = on_research_finished,
     [defines.events.on_force_created] = on_force_created,
     [defines.events.on_surface_created] = on_surface_created,
+    [defines.events.on_runtime_mod_setting_changed] = on_runtime_mod_setting_changed,
 }
 lib.on_init = on_init
 lib.on_configuration_changed = on_configuration_changed

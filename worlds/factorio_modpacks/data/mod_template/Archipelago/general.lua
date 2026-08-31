@@ -79,7 +79,9 @@ function general.technologies.progressive()
 end
 
 function general.technologies.removed_technologies()
-    return {{ variable_to_lua(removed_technologies) }}
+    local removed_techs = {{ variable_to_lua(removed_technologies) }}
+    table.insert(removed_techs, "Starting-recipes")
+    return removed_techs
 end
 
 function general.technologies.local_items()
