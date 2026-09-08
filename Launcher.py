@@ -85,7 +85,12 @@ def launch(exe: Sequence[str], in_terminal: bool = False) -> bool:
                 lib_path_setter = f"env LD_LIBRARY_PATH={shlex.quote(ld_lib_path)} " if ld_lib_path else ""
                 env = env_cleared_lib_path()
 
-                subprocess.Popen([terminal, "-e", lib_path_setter + shlex.join(exe)], env=env)
+                modern_terminals = {"cosmic-term"}
+                real_path = os.path.realpath(terminal)
+                if any(terminal in real_path for terminal in modern_terminals):
+                    subprocess.Popen([terminal, "--", "sh", "-c", lib_path_setter + shlex.join(exe)], env=env)
+                else:
+                    subprocess.Popen([terminal, "-e", lib_path_setter + shlex.join(exe)], env=env)
                 return True
         elif is_macos:
             terminal = [which("open"), "-W", "-a", "Terminal.app"]
