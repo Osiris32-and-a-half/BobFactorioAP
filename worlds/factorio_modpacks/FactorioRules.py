@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, override
 from rule_builder.rules import Has, Rule, And, Or
 from worlds.AutoWorld import LogicMixin
 from . import FactorioModpack
-from .RecipeEngine.NodeComponents.LogicComponents import BaseLogic, MultiLogicComponent
+from .RecipeEngine.NodeComponents.LogicComponents import MultiLogicComponent
 from .RecipeEngine.Nodes import Node, OrNode, AndNode
 
 if TYPE_CHECKING:
