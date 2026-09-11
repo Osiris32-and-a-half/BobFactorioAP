@@ -1,6 +1,6 @@
 {
   "forced_locations": {
-    "start": ["automation", "electronics"],
+    "start": ["automation", "electronics", "bob-greenhouse"],
     "end": ["rocket-silo"]
   }
 }
