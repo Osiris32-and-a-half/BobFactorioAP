@@ -91,7 +91,7 @@ class GameItemManager:
                 for category in categories:
                     get_or_create_category(category).add_required(self.character_node, 0)
                     get_or_create_category(category).manual = True
-                get_or_create_category("basic-crafting").add_required(self.character_node, 0) # somehow this is implied and not exported
+                # get_or_create_category("basic-crafting").add_required(self.character_node, 0) # somehow this is implied and not exported
                 get_or_create_category("basic-solid").add_required(self.character_node, 0) # this is not a crafting category so not extracted todo look if some ores can't do this
                 continue
 
