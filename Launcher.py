@@ -73,32 +73,8 @@ def launch(exe: Sequence[str], in_terminal: bool = False) -> bool:
 
     If `in_terminal` is True, it will attempt to run in a terminal window,
     and the return value will indicate whether one was found."""
-    if in_terminal:
-        if is_windows:
-            # intentionally using a window title with a space so it gets quoted and treated as a title
-            subprocess.Popen(["start", "Running Archipelago", *exe], shell=True)
-            return True
-        elif is_linux:
-            terminal = which("x-terminal-emulator") or which("konsole") or which("gnome-terminal") or which("xterm")
-            if terminal:
-                # Clear LD_LIB_PATH during terminal startup, but set it again when running command in case it's needed
-                ld_lib_path = os.environ.get("LD_LIBRARY_PATH")
-                lib_path_setter = f"env LD_LIBRARY_PATH={shlex.quote(ld_lib_path)} " if ld_lib_path else ""
-                env = env_cleared_lib_path()
-
-                # Terminals have started deprecating `-e` flag with some not implementing it at all
-                # `modern_terminals` is a list of terminals which we want/need to use `--` instead
-                modern_terminals = {"cosmic-term", "ptyxis"}
-                real_terminal_name = pathlib.Path(terminal).resolve().name
-                if any(terminal==real_terminal_name for terminal in modern_terminals):
-                    subprocess.Popen([terminal, "--", "sh", "-c", lib_path_setter + shlex.join(exe)], env=env)
-                else:
-                    subprocess.Popen([terminal, "-e", "sh", "-c", lib_path_setter + shlex.join(exe)], env=env)
-                return True
-        elif is_macos:
-            terminal = [which("open"), "-W", "-a", "Terminal.app"]
-            subprocess.Popen([*terminal, *exe])
-            return True
+    if in_terminal and Utils.run_in_terminal(exe):
+        return True
     subprocess.Popen(exe)
     return False
 

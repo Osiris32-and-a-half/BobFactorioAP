@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import json
+import shlex
 import typing
 import builtins
 import os
@@ -18,8 +19,9 @@ import logging
 import warnings
 
 from argparse import Namespace
-from collections.abc import Collection, Iterable
+from collections.abc import Collection, Iterable, Sequence
 from datetime import datetime, timezone
+from shutil import which
 
 from settings import Settings, get_settings
 from time import sleep
@@ -285,7 +287,8 @@ def get_public_ipv4() -> str:
 
     ctx = get_cert_none_ssl_context()
     try:
-        ip = urllib.request.urlopen("https://checkip.amazonaws.com/", context=ctx, timeout=10).read().decode("utf8").strip()
+        ip = urllib.request.urlopen("https://checkip.amazonaws.com/", context=ctx, timeout=10).read().decode(
+            "utf8").strip()
     except Exception as e:
         # noinspection PyBroadException
         try:
@@ -504,8 +507,9 @@ class ByValue:
     Mixin for enums to pickle value instead of name (restores pre-3.11 behavior). Use as left-most parent.
     See https://github.com/python/cpython/pull/26658 for why this exists.
     """
+
     def __reduce_ex__(self, prot):
-        return self.__class__, (self._value_, )
+        return self.__class__, (self._value_,)
 
 
 class KeyedDefaultDict(collections.defaultdict):
@@ -607,6 +611,7 @@ def init_logging(name: str, loglevel: typing.Union[str, int] = logging.INFO,
                         logging.exception(e)
                     else:
                         logging.debug(f"Deleted old logfile {file.path}")
+
     import threading
     threading.Thread(target=_cleanup, name="LogCleaner").start()
     import platform
@@ -684,7 +689,7 @@ def get_fuzzy_results(input_word: str, word_list: typing.Collection[str], limit:
     limit = limit if limit else len(word_list)
     return list(
         map(
-            lambda container: (container[0], int(container[1]*100)),  # convert up to limit to int %
+            lambda container: (container[0], int(container[1] * 100)),  # convert up to limit to int %
             sorted(
                 map(lambda candidate: (candidate, get_fuzzy_ratio(input_word, candidate)), word_list),
                 key=lambda element: element[1],
@@ -760,6 +765,40 @@ def env_cleared_lib_path() -> Mapping[str, str]:
     return env
 
 
+def run_in_terminal(exe: Sequence[str]) -> bool:
+    """
+    Runs the given command/args in `exe` in a new ternminal window
+
+    Returns value indicates if a valid terminal was located
+    """
+    if is_windows:
+        # intentionally using a window title with a space so it gets quoted and treated as a title
+        subprocess.Popen(["start", "Running Archipelago", *exe], shell=True)
+        return True
+    elif is_linux:
+        terminal = which("x-terminal-emulator") or which("konsole") or which("gnome-terminal") or which("xterm")
+        if terminal:
+            # Clear LD_LIB_PATH during terminal startup, but set it again when running command in case it's needed
+            ld_lib_path = os.environ.get("LD_LIBRARY_PATH")
+            lib_path_setter = f"env LD_LIBRARY_PATH={shlex.quote(ld_lib_path)} " if ld_lib_path else ""
+            env = env_cleared_lib_path()
+
+            # Terminals have started deprecating `-e` flag with some not implementing it at all
+            # `modern_terminals` is a list of terminals which we want/need to use `--` instead
+            modern_terminals = {"cosmic-term", "ptyxis"}
+            real_terminal_name = pathlib.Path(terminal).resolve().name
+            if any(terminal == real_terminal_name for terminal in modern_terminals):
+                subprocess.Popen([terminal, "--", "sh", "-c", lib_path_setter + shlex.join(exe)], env=env)
+            else:
+                subprocess.Popen([terminal, "-e", "sh", "-c", lib_path_setter + shlex.join(exe)], env=env)
+            return True
+    elif is_macos:
+        terminal = [which("open"), "-W", "-a", "Terminal.app"]
+        subprocess.Popen([*terminal, *exe])
+        return True
+    return False
+
+
 def _mp_open_filename(res: "multiprocessing.Queue[typing.Optional[str]]", *args: Any) -> None:
     if is_kivy_running():
         raise RuntimeError("kivy should not be running in multiprocess")
@@ -770,7 +809,8 @@ def _mp_save_filename(res: "multiprocessing.Queue[typing.Optional[str]]", *args:
     if is_kivy_running():
         raise RuntimeError("kivy should not be running in multiprocess")
     res.put(save_filename(*args))
-    
+
+
 def _run_for_stdout(*args: str):
     env = env_cleared_lib_path()
     return subprocess.run(args, capture_output=True, text=True, env=env).stdout.split("\n", 1)[0] or None
@@ -885,7 +925,7 @@ def open_directory(title: str, suggest: str = "") -> typing.Optional[str]:
         kdialog = which("kdialog")
         if kdialog:
             return _run_for_stdout(kdialog, f"--title={title}", "--getexistingdirectory",
-                       os.path.abspath(suggest) if suggest else ".")
+                                   os.path.abspath(suggest) if suggest else ".")
         zenity = which("zenity")
         if zenity:
             z_filters = ("--directory",)
@@ -962,8 +1002,10 @@ def messagebox(title: str, text: str, error: bool = False) -> None:
 gui_enabled = not sys.stdout or "--nogui" not in sys.argv
 """Checks if the user wanted no GUI mode and has a terminal to use it with."""
 
+
 def title_sorted(data: typing.Iterable, key=None, ignore: typing.AbstractSet[str] = frozenset(("a", "the"))):
     """Sorts a sequence of text ignoring typical articles like "a" or "the" in the beginning."""
+
     def sorter(element: Union[str, Dict[str, Any]]) -> str:
         if (not isinstance(element, str)):
             element = element["title"]
@@ -973,6 +1015,7 @@ def title_sorted(data: typing.Iterable, key=None, ignore: typing.AbstractSet[str
             return parts[1].lower()
         else:
             return element.lower()
+
     return sorted(data, key=lambda i: sorter(key(i)) if key else sorter(i))
 
 
@@ -1028,10 +1071,10 @@ def _extend_freeze_support() -> None:
 
         # Handle the first process that MP will create
         if (
-            len(sys.argv) >= 2 and sys.argv[-2] == '-c' and sys.argv[-1].startswith((
+                len(sys.argv) >= 2 and sys.argv[-2] == '-c' and sys.argv[-1].startswith((
                 'from multiprocessing.resource_tracker import main',
                 'from multiprocessing.forkserver import main'
-            )) and set(sys.argv[1:-2]) == set(_args_from_interpreter_flags())
+        )) and set(sys.argv[1:-2]) == set(_args_from_interpreter_flags())
         ):
             exec(sys.argv[-1])
             sys.exit()
