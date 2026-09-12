@@ -85,7 +85,7 @@ def launch(exe: Sequence[str], in_terminal: bool = False) -> bool:
                 lib_path_setter = f"env LD_LIBRARY_PATH={shlex.quote(ld_lib_path)} " if ld_lib_path else ""
                 env = env_cleared_lib_path()
 
-                modern_terminals = {"cosmic-term"}
+                modern_terminals = {"cosmic-term", "ptyxis"}
                 real_terminal_name = pathlib.Path(terminal).resolve().name
                 if any(terminal==real_terminal_name for terminal in modern_terminals):
                     subprocess.Popen([terminal, "--", "sh", "-c", lib_path_setter + shlex.join(exe)], env=env)
