@@ -12,6 +12,7 @@ import argparse
 import logging
 import multiprocessing
 import os
+import pathlib
 import shlex
 import subprocess
 import sys
