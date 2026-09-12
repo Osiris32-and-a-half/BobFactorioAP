@@ -90,7 +90,7 @@ def launch(exe: Sequence[str], in_terminal: bool = False) -> bool:
                 if any(terminal==real_terminal_name for terminal in modern_terminals):
                     subprocess.Popen([terminal, "--", "sh", "-c", lib_path_setter + shlex.join(exe)], env=env)
                 else:
-                    subprocess.Popen([terminal, "-e", lib_path_setter + shlex.join(exe)], env=env)
+                    subprocess.Popen([terminal, "-e", "sh", "-c", lib_path_setter + shlex.join(exe)], env=env)
                 return True
         elif is_macos:
             terminal = [which("open"), "-W", "-a", "Terminal.app"]
