@@ -12,13 +12,10 @@ import argparse
 import logging
 import multiprocessing
 import os
-import pathlib
-import shlex
 import subprocess
 import sys
 import urllib.parse
 from collections.abc import Callable, Sequence
-from shutil import which
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -30,7 +27,7 @@ if __name__ == "__main__":
     ModuleUpdate.update()
 
 import Utils
-from Utils import env_cleared_lib_path, init_logging, is_linux, is_macos, is_windows, local_path
+from Utils import init_logging, local_path
 
 if __name__ == "__main__":
     init_logging('Launcher')
