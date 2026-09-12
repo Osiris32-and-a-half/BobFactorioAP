@@ -86,6 +86,8 @@ def launch(exe: Sequence[str], in_terminal: bool = False) -> bool:
                 lib_path_setter = f"env LD_LIBRARY_PATH={shlex.quote(ld_lib_path)} " if ld_lib_path else ""
                 env = env_cleared_lib_path()
 
+                # Terminals have started deprecating `-e` flag with some not implementing it at all
+                # `modern_terminals` is a list of terminals which we want/need to use `--` instead
                 modern_terminals = {"cosmic-term", "ptyxis"}
                 real_terminal_name = pathlib.Path(terminal).resolve().name
                 if any(terminal==real_terminal_name for terminal in modern_terminals):
