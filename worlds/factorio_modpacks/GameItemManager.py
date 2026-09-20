@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from functools import cache, cached_property
 from math import floor
 from typing import TYPE_CHECKING
 
@@ -336,6 +337,7 @@ class FactorioRecipeComponent(BaseNodeComponent):
                 return node.name[9:]
         raise Exception(f"couldn't find category for {self.owner.name}")
 
+    @cached_property
     def ingredients_export(self) -> str:
         lua_ingredients: list[str] = []
         for ingredient in self.owner.required:
@@ -349,6 +351,7 @@ class FactorioRecipeComponent(BaseNodeComponent):
                                     f"}}"))
         return f"{{{",".join(lua_ingredients)}}}"
 
+    @cached_property
     def products_export(self) -> str:
         lua_products: list[str] = []
         for product in self.owner.used_by:
