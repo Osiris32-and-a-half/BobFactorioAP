@@ -114,7 +114,7 @@ function general.recipes.time_adjustments()
         {%- endfor -%}
         {% elif recipe_time_range %}
         {%- for recipe_name, recipe in recipes.items() %}
-        {%- if recipe.category not in ("basic-solid", "basic-fluid", "water") %}
+        {%- if recipe.category not in ("basic-solid", "basic-fluid", "water") and recipe.products_export != "{}" %}
         ["{{ recipe_name }}"] =  {{ flop_random(*recipe_time_range) }},
         {%- endif %}
         {%- endfor -%}
